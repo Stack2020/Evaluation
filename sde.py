@@ -3,6 +3,7 @@ from typing import Dict, Tuple
 
 import torch
 import torch.nn.functional as F
+
 def beta_t(t: torch.Tensor, beta_min: float, beta_max: float) -> torch.Tensor:
     return beta_min + t * (beta_max - beta_min)
 
