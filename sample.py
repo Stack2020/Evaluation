@@ -1,10 +1,11 @@
 from typing import Dict
 import matplotlib.pyplot as plt
-import numpy as np
+
 import torch
 from numpy.linalg import norm
 from config import config_path
 from sde import beta_t, drift_pf
+import numpy as np
 from util import (
     fmt,
     scatter_side_by_side_shared,

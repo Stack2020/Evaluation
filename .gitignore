@@ -1,0 +1,21 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+.vscode/
+.venv/
+venv/
+.ipynb_checkpoints/
+
+
+build/
+dist/
+*.egg-info/
+
+
+outputs/
+logs/
+runs/
+checkpoints/
+*.pt
