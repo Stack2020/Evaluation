@@ -8,6 +8,7 @@ from sde import dsm_loss_batch
 from util import evaluation_loss, evaluation_nll
 
 
+
 def train_model(
     model,
     config: Dict,
@@ -17,6 +18,8 @@ def train_model(
     checkpoint_path: str = config_path,
     enable_nll: bool = False,
 ) -> None:
+
+
 
     optimizer = AdamW(model.parameters(), lr=config["lr"], weight_decay=config["weight_decay"])
 
@@ -28,6 +31,8 @@ def train_model(
         T_max=max(1, config["epochs"] - warmup_epochs),
         eta_min=config["lr"] * 0.1,
     )
+
+
     scheduler = SequentialLR(optimizer, [warm, cos], milestones=[warmup_epochs])
 
     best_metric = float("inf")

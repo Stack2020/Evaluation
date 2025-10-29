@@ -18,7 +18,7 @@ def calculate_liklihood(
 ) -> Tuple[torch.Tensor, float]:
     allowed_methods = {"euler", "heun", "rk4"}
     method = method.lower()
-    if method_key not in allowed_methods:
+    if method not in allowed_methods:
         raise ValueError(
             f"Unsupported method '{method}'. Expected one of {{'Euler', 'Heun', 'RK4'}}."
         )

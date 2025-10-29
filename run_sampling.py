@@ -11,7 +11,6 @@ from sample import (
 )
 import warnings
 
-
 def main() -> None:
     warnings.filterwarnings("ignore")
     device = get_device()
@@ -22,6 +21,7 @@ def main() -> None:
     checkpoint = load_checkpoint(model, config_path, device)
     checkpoint_config = checkpoint.get("config", config)
     test_np = generate_test(checkpoint_config)
+    
     with torch.no_grad():
         pc_samples = pc_sample(model, checkpoint_config, device, checkpoint_config["n_gen"]).cpu().numpy()
         pf_samples = pf_sample(model, checkpoint_config, device, checkpoint_config["n_gen"]).cpu().numpy()
