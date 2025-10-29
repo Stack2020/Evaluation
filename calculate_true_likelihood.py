@@ -19,6 +19,7 @@ def gaussian_log_prob(
     return -0.5 * (exponent + log_det + dim * np.log(2.0 * np.pi))
 
 
+
 def calculate_true_likelihood(
     config: Dict,
     device: torch.device,
