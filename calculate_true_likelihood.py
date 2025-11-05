@@ -3,7 +3,6 @@ from typing import Dict, Tuple
 
 import numpy as np
 import torch
-from data_loader import generate_test
 
 def gaussian_log_prob(
     x: torch.Tensor,
@@ -23,19 +22,19 @@ def gaussian_log_prob(
 def calculate_true_likelihood(
     config: Dict,
     device: torch.device,
+    test_tensor: torch.Tensor,
 ) -> Tuple[torch.Tensor, float]:
-    """Return per-sample log-likelihoods and mean NLL using the true Gaussian."""
+
     mean_np = np.asarray(config["mu"], dtype=np.float64)
     cov_np = np.asarray(config["sigma"], dtype=np.float64)
 
-    test_np = generate_test(config)
-    test_tensor = torch.from_numpy(test_np).to(device=device, dtype=torch.float64)
-
+    test_tensor = test_tensor.to(device=device, dtype=torch.float64)
     mean = torch.as_tensor(mean_np, device=device, dtype=test_tensor.dtype)
     cov = torch.as_tensor(cov_np, device=device, dtype=test_tensor.dtype)
     cov_inv = torch.inverse(cov)
 
     log_probs = gaussian_log_prob(test_tensor, mean, cov, cov_inv)
+    
     log_probs_tensor = log_probs.to(dtype=torch.float32)
     mean_nll = float((-log_probs_tensor).mean().item())
     return log_probs_tensor, mean_nll

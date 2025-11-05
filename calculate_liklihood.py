@@ -4,7 +4,7 @@ from typing import Dict, Optional, Tuple
 import torch
 
 from data_loader import generate_test
-from integral_utils import integrate_log_probability
+from util import integrate_log_probability
 
 def calculate_liklihood(
     model,
@@ -15,6 +15,7 @@ def calculate_liklihood(
     eps: Optional[float] = None,
     batch_size: int = 128,
     method: str = "Heun",
+    test_tensor: Optional[torch.Tensor] = None,
 ) -> Tuple[torch.Tensor, float]:
     allowed_methods = {"euler", "heun", "rk4"}
     method = method.lower()
@@ -22,12 +23,13 @@ def calculate_liklihood(
         raise ValueError(
             f"Unsupported method '{method}'. Expected one of {{'Euler', 'Heun', 'RK4'}}."
         )
-
-    steps = int(steps or config.get("nll_eval_steps", config.get("nll_steps", 1200)))
+    print(steps)
     eps = float(eps or config.get("nll_eval_eps", config.get("eps", 1e-3)))
 
-    test_np = generate_test(config)
-    test_tensor = torch.from_numpy(test_np).to(device)
+    if test_tensor is None:
+        test_np = generate_test(config)
+        test_tensor = torch.from_numpy(test_np)
+    test_tensor = test_tensor.to(device)
 
     prev_mode = model.training
     model.eval()

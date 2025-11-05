@@ -3,13 +3,16 @@ import matplotlib.pyplot as plt
 
 import torch
 from numpy.linalg import norm
-from config import config_path
-from sde import beta_t, drift_pf
+
+from sde import beta_t, drift_pf, diffusion_coeff
 import numpy as np
-from util import (
-    fmt,
-    scatter_side_by_side_shared,
-)
+
+
+def fmt(array) -> str:
+    """Nicely format arrays for logging statistics."""
+    arr = np.asarray(array, dtype=np.float64)
+    return np.array2string(arr, precision=4, suppress_small=True)
+
 
 def alpha_bar(t: torch.Tensor, beta_min: float, beta_max: float) -> torch.Tensor:
 
@@ -40,10 +43,13 @@ def pc_sample(
         t_next = ts[i + 1]
         dt = t_next - t
         beta = beta_t(t, config["beta_min"], config["beta_max"]).clamp_min(1e-8)
+        diffusion = diffusion_coeff(t, config)
         score = model(x, t.expand(n_samples))
-        drift = (-0.5 * beta) * x - beta * score
+        drift = (-0.5 * beta) * x - (diffusion**2) * score
 
-        x = x + drift * dt + torch.sqrt(beta * abs(dt)) * torch.randn_like(x)
+        noise_scale = diffusion * torch.sqrt(torch.clamp(abs(dt), min=1e-12))
+        x = x + drift * dt + noise_scale * torch.randn_like(x)
+        #标准差
         sigma = torch.sqrt(1.0 - alpha_bar(t_next, config["beta_min"], config["beta_max"]).clamp(min=1e-12))
 
         for _ in range(corrector_steps):
@@ -103,12 +109,15 @@ def pf_drift_true(
     mean_t = torch.sqrt(ab) * mu
     cov_t = ab * sigma + (1.0 - ab) * eye
     score = -torch.linalg.solve(cov_t, (x_state - mean_t).T).T
+    t_expanded = t_scalar.expand(x_state.shape[0])
     beta = beta_t(
-        t_scalar.expand(x_state.shape[0]),
+        t_expanded,
         config["beta_min"],
         config["beta_max"],
-    ).clamp_min(1e-8).view(-1, 1)
-    return (-0.5 * beta) * x_state - 0.5 * beta * score
+    ).clamp_min(1e-8).reshape(-1, 1)
+    diffusion = diffusion_coeff(t_expanded, config).reshape(-1, 1)
+    diffusion_sq = diffusion * diffusion
+    return (-0.5 * beta) * x_state - 0.5 * diffusion_sq * score
 
 
 @torch.no_grad()
@@ -159,7 +168,7 @@ def generate_samples(
     model,
     config: Dict,
     device: torch.device,
-    checkpoint_path: str = config_path,
+    checkpoint_path: str,
     method: str = "pc",
     **kwargs,
 ) -> np.ndarray:
@@ -172,18 +181,6 @@ def generate_samples(
         else:
             samples = pc_sample(model, config, device, config["n_gen"], **kwargs)
     return samples.cpu().numpy()
-
-
-def plot_sample_scatter(true_samples: np.ndarray, gen_samples: np.ndarray, config: Dict):
-    fig, _ = scatter_side_by_side_shared(
-        true_samples,
-        gen_samples,
-        config,
-        max_show=min(config["n_test"], config["n_gen"]),
-    )
-    plt.show()
-    return fig
-
 
 def report_statistics(gen: np.ndarray, config: Dict, te: np.ndarray):
     mu_gen = gen.mean(axis=0)

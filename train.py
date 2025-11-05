@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
-from config import config_path
+
 from sde import dsm_loss_batch
 from util import evaluation_loss, evaluation_nll
 
@@ -15,7 +15,7 @@ def train_model(
     device: torch.device,
     train_loader,
     val_loader,
-    checkpoint_path: str = config_path,
+    checkpoint_path: str,
     enable_nll: bool = False,
 ) -> None:
 

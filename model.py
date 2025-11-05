@@ -10,6 +10,7 @@ class TimeEmbedding(nn.Module):
         angles = t * self.freqs
         return torch.cat([torch.sin(angles), torch.cos(angles)], dim=-1)
 
+
 class ScoreNet(nn.Module):
     def __init__(self, hidden: int = 128, layers: int = 3, t_embed_dim: int = 32):
         super().__init__()
