@@ -56,17 +56,21 @@ def main() -> None:
     device = get_device()
     model = build_model(config, device)
     checkpoint = load_checkpoint(model, config["config_path"], device)
-    checkpoint_config: dict = checkpoint.get("config", config)
+    checkpoint_config: dict = checkpoint.get("config", {}).copy()
+    for key, value in config.items():
+        checkpoint_config.setdefault(key, value)
     print("Using configuration:", checkpoint_config)
     test_np = generate_test(checkpoint_config)
+    max_points = int(checkpoint_config.get("density_eval_points", test_np.shape[0]))
+    eval_np = test_np[:max(1, min(max_points, test_np.shape[0]))]
 
     mean = np.asarray(checkpoint_config["mu"], dtype=np.float64)
     cov = np.asarray(checkpoint_config["sigma"], dtype=np.float64)
     
-    true_log_density = gaussian_log_density(test_np, mean, cov)
+    true_log_density = gaussian_log_density(eval_np, mean, cov)
 
-    steps_eval = int(1000)
-    print(steps_eval)
+    steps_eval = int(checkpoint_config.get("density_eval_steps", 1000))
+    print(f"Density eval steps: {steps_eval}, points: {eval_np.shape[0]}")
 
     eps_eval = float(
         checkpoint_config.get(
@@ -80,7 +84,7 @@ def main() -> None:
         model,
         checkpoint_config,
         device,
-        test_np,
+        eval_np,
         steps=steps_eval,
         eps=eps_eval,
         method=method,
@@ -90,14 +94,25 @@ def main() -> None:
     
     true_density = np.exp(true_log_density)
 
+    abs_err = np.abs(model_density - true_density)
+    rel_err = abs_err / np.maximum(true_density, 1e-12)
+    print(
+        "Density error | abs(mean/median/max) = "
+        f"{abs_err.mean():.4e}/{np.median(abs_err):.4e}/{abs_err.max():.4e}"
+    )
+    print(
+        "Density error | rel(mean/median/p95) = "
+        f"{rel_err.mean():.4e}/{np.median(rel_err):.4e}/{np.percentile(rel_err, 95):.4e}"
+    )
+
     density_data = np.column_stack(
-        (test_np[:, 0], test_np[:, 1], model_density, true_density)
+        (eval_np[:, 0], eval_np[:, 1], model_density, true_density, abs_err, rel_err)
     )
     np.savetxt(
         "density.csv",
         density_data,
         delimiter=",",
-        header="x,y,model_density,true_density",
+        header="x,y,model_density,true_density,abs_err,rel_err",
         comments="",
     )
 

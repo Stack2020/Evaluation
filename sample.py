@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import torch
 from numpy.linalg import norm
 
-from sde import beta_t, drift_pf, diffusion_coeff
+from sde import beta_t, drift_pf, diffusion_coeff, v_to_score, v_to_x0
 import numpy as np
 
 
@@ -44,7 +44,8 @@ def pc_sample(
         dt = t_next - t
         beta = beta_t(t, config["beta_min"], config["beta_max"]).clamp_min(1e-8)
         diffusion = diffusion_coeff(t, config)
-        score = model(x, t.expand(n_samples))
+        t_batch = t.expand(n_samples)
+        score = v_to_score(model(x, t_batch), x, t_batch, config)
         drift = (-0.5 * beta) * x - (diffusion**2) * score
 
         noise_scale = diffusion * torch.sqrt(torch.clamp(abs(dt), min=1e-12))
@@ -53,15 +54,16 @@ def pc_sample(
         sigma = torch.sqrt(1.0 - alpha_bar(t_next, config["beta_min"], config["beta_max"]).clamp(min=1e-12))
 
         for _ in range(corrector_steps):
-            score = model(x, t_next.expand(n_samples))
+            t_next_batch = t_next.expand(n_samples)
+            score = v_to_score(model(x, t_next_batch), x, t_next_batch, config)
             avg_norm = score.reshape(n_samples, -1).norm(dim=1).mean().clamp_min(1e-6)
             step_eps = 2.0 * (snr * sigma / avg_norm) ** 2
             x = x + step_eps * score + torch.sqrt(2.0 * step_eps) * torch.randn_like(x)
 
     t_final = ts[-1]
-    ab = alpha_bar(t_final, config["beta_min"], config["beta_max"])
-    score = model(x, t_final.expand(n_samples))
-    return (x + (1.0 - ab) * score) / torch.sqrt(ab + 1e-12)
+    t_final_batch = t_final.expand(n_samples)
+    v_final = model(x, t_final_batch)
+    return v_to_x0(v_final, x, t_final_batch, config)
 
 
 @torch.no_grad()
@@ -92,9 +94,10 @@ def pf_sample(
         drift_next = drift_pf(model, x_pred, t_next_expand, config)
         x = x + 0.5 * dt * (drift_t + drift_next)
 
-    ab = alpha_bar(ts[-1], config["beta_min"], config["beta_max"])
-    score = model(x, ts[-1].expand(n_samples))
-    return (x + (1.0 - ab) * score) / torch.sqrt(ab + 1e-12)
+    t_final = ts[-1]
+    t_final_batch = t_final.expand(n_samples)
+    v_final = model(x, t_final_batch)
+    return v_to_x0(v_final, x, t_final_batch, config)
 
 
 def pf_drift_true(

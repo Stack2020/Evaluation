@@ -83,6 +83,7 @@ def train_model(
     )
 
     eta_min = float(config.get("lr_min", 1e-5))  # 比 0.1*lr 更激进，利于跳出 plateau
+    
     cos = CosineAnnealingLR(
         optimizer,
         T_max=max(1, total_epochs - warmup_epochs),

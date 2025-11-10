@@ -11,6 +11,22 @@ from sde import (
     terminal_logp_gaussian
     )
 
+
+def build_time_grid(
+    steps: int,
+    eps_val: float,
+    device: torch.device,
+    dtype: torch.dtype,
+    config: Dict,
+) -> torch.Tensor:
+    schedule = str(config.get("nll_time_schedule", "linear")).lower()
+    if schedule == "power":
+        gamma = max(float(config.get("nll_time_gamma", 2.0)), 1e-6)
+        tau = torch.linspace(0.0, 1.0, steps, device=device, dtype=dtype)
+        scaled = torch.pow(tau, gamma)
+        return eps_val + (1.0 - eps_val) * scaled
+    return torch.linspace(eps_val, 1.0, steps, device=device, dtype=dtype)
+
 def integrate_log_probability(
     model,
     x0: torch.Tensor,
@@ -28,13 +44,14 @@ def integrate_log_probability(
 
     device, dtype = x0.device, x0.dtype
     batch = x0.shape[0]
-    ts = torch.linspace(eps_val, 1.0, steps, device=device, dtype=dtype)
-    dt = ts[1] - ts[0]
+    ts = build_time_grid(steps, eps_val, device, dtype, config)
+    dts = ts[1:] - ts[:-1]
     x = x0.detach()
     accum = torch.zeros(batch, device=device, dtype=dtype)
 
     if method_name == "heun":
         for i in range(steps - 1):
+            dt = dts[i]
             t_curr = ts[i].expand(batch)
             x_req = x.detach().requires_grad_(True)
             drift_curr = drift_pf(model, x_req, t_curr, config)         
@@ -64,6 +81,7 @@ def integrate_log_probability(
         accum = torch.zeros(batch, device=device, dtype=dtype)
 
         for i in range(steps - 1):
+            dt = dts[i]
             t_curr = ts[i].expand(batch)
             x_req = x.detach().requires_grad_(True)
             drift_curr = drift_pf(model, x_req, t_curr, config)
@@ -78,8 +96,9 @@ def integrate_log_probability(
     if method_name == "rk45":
         x = x0.detach()
         accum = torch.zeros(batch, device=device, dtype=dtype)
-        half_dt = 0.5 * dt
         for i in range(steps - 1):
+            dt = dts[i]
+            half_dt = 0.5 * dt
             t_curr = ts[i].expand(batch)
             x1 = x.detach().requires_grad_(True)
             drift1 = drift_pf(model, x1, t_curr, config)

@@ -9,13 +9,19 @@ config = {
     "sigma": [[1.0, 0.6], [0.6, 1.5]],
     "beta_min": 0.1,
     "beta_max": 20.0,
-    "sde_type": "subvp",
     "eps": 1e-3,
+    "density_eval_points": 2000,
+    "density_eval_steps": 600,
+    "nll_time_schedule": "power",
+    "nll_time_gamma": 2.5,
+    "loss_time_gamma": 2.2,
+    "loss_time_reweight": False,
+    "loss_time_weight_max": 0.0,
     "hidden": 64,  # 从128增加到256
     "layers": 3,   # 从8增加到10
     "t_embed_dim": 64,
     "batch_size": 128,
-    "epochs": 100000,  # 训练更久
+    "epochs": 2000,  # 训练更久
     "lr": 1e-3,      # 降低学习率，更稳定
     "weight_decay": 1e-4,
     "clip_grad_norm": 5.0,
