@@ -1,6 +1,5 @@
 ﻿import math
 from typing import Dict, Tuple
-
 import torch
 import torch.nn.functional as F
 
@@ -17,13 +16,8 @@ def alpha_bar(t: torch.Tensor, beta_min: float, beta_max: float) -> torch.Tensor
 
 
 def diffusion_coeff(t: torch.Tensor, config: Dict) -> torch.Tensor:
-    """Diffusion coefficient g(t) for the configured SDE."""
+    """Diffusion coefficient g(t) for VP-SDE: g(t) = sqrt(beta(t))."""
     beta = beta_t(t, config["beta_min"], config["beta_max"]).to(t).clamp_min(1e-8)
-    sde_type = config.get("sde_type", "vp").lower()
-    if sde_type == "subvp":
-        lambda_t = integral_beta(t, config["beta_min"], config["beta_max"])
-        noise_scale = 1.0 - torch.exp(-2.0 * lambda_t)
-        return torch.sqrt(beta * torch.clamp(noise_scale, min=0.0))
     return torch.sqrt(beta)
 
 @torch.no_grad()
@@ -32,56 +26,48 @@ def forward_perturb(
     t: torch.Tensor,
     beta_min: float,
     beta_max: float,
-    sde_type: str = "subvp",
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Forward perturbation kernel for SDE.
+    """Forward perturbation kernel for VP-SDE.
     
-    For VP SDE: std = sqrt(1 - α̅(t))
-    For Sub-VP SDE: std = sqrt(1 - exp(-2∫β))
+    VP-SDE: x_t = sqrt(α̅(t)) x_0 + sqrt(1 - α̅(t)) ε
+    where α̅(t) = exp(-∫₀ᵗ β(s) ds)
     """
     lambda_t = integral_beta(t, beta_min, beta_max).unsqueeze(-1)
-    a = torch.exp(-lambda_t)  # α̅(t)
-    mean = torch.sqrt(a) * x0
-    
-    if sde_type.lower() == "subvp":
-        # Sub-VP: std = sqrt(1 - exp(-2∫β))
-        std = torch.sqrt(torch.clamp(1.0 - torch.exp(-2.0 * lambda_t), min=1e-12))
-    else:
-        # VP: std = sqrt(1 - α̅(t))
-        std = torch.sqrt(torch.clamp(1.0 - a, min=1e-12))
-    
+    alpha_bar = torch.exp(-lambda_t)  # α̅(t)
+    mean = torch.sqrt(alpha_bar) * x0
+    std = torch.sqrt(torch.clamp(1.0 - alpha_bar, min=1e-12))
     eps = torch.randn_like(x0)
     xt = mean + std * eps
     return xt, mean, std
 
 
 def dsm_loss_batch(model, x0: torch.Tensor, config: Dict) -> torch.Tensor:
-    """Denoising Score Matching loss for Sub-VP SDE.
-    
-    The weight function should match the forward variance:
-    - VP SDE: weight = (1 - α̅(t))^γ
-    - Sub-VP SDE: weight = (1 - exp(-2∫β))^γ = var^γ
+    """Noise prediction loss for VP-SDE.
+
+    L = E_t E_x0 E_{x_t|x0,t} [ || ε_θ(x_t, t) - ε ||^2 ],
+    where ε_θ(x_t, t) = -std(t) * s_θ(x_t, t), and
+    x_t = mean + std * ε with mean = sqrt(α̅(t)) x_0.
     """
     beta_min, beta_max = config["beta_min"], config["beta_max"]
     eps = config["eps"]
-    gamma = config.get("lambda_gamma", 1.0)
-    sde_type = config.get("sde_type", "subvp")
     batch = x0.shape[0]
     t = torch.rand(batch, device=x0.device) * (1.0 - eps) + eps
-    xt, mean, std = forward_perturb(x0, t, beta_min, beta_max, sde_type)
-    var = torch.clamp(std**2, min=1e-12)
-    target = -(xt - mean) / var
-    pred = model(xt, t)
-    mse = F.mse_loss(pred, target, reduction="none").sum(dim=1)
-    
-    # Use variance as weight for Sub-VP SDE
-    if sde_type.lower() == "subvp":
-        weight = var.squeeze(-1).detach() ** gamma
-    else:
-        # VP SDE: use (1 - α̅(t))
-        weight = (1.0 - alpha_bar(t, beta_min, beta_max)).detach() ** gamma
-    
-    return (weight * mse).mean()
+    # Compute VP mean/std and sample standard normal noise directly
+    lambda_t = integral_beta(t, beta_min, beta_max).unsqueeze(-1)
+    a_bar = torch.exp(-lambda_t)
+    mean = torch.sqrt(a_bar) * x0
+    std = torch.sqrt(torch.clamp(1.0 - a_bar, min=1e-12))
+    eps_true = torch.randn_like(x0)
+
+    xt = mean + std * eps_true
+    # Predict score and convert to noise prediction
+    score_pred = model(xt, t)
+
+    eps_pred = -std * score_pred
+    # Unweighted MSE over feature dimension, then mean over batch
+
+    mse = F.mse_loss(eps_pred, eps_true, reduction="none").sum(dim=1)
+    return mse.mean()
 
 
 def prior_logp_standard_normal(z: torch.Tensor) -> torch.Tensor:
@@ -90,46 +76,39 @@ def prior_logp_standard_normal(z: torch.Tensor) -> torch.Tensor:
 
 
 def terminal_logp_gaussian(x: torch.Tensor, config: Dict) -> torch.Tensor:
-    """Exact log density of x at t=1 for the sub-VP forward SDE.
+    """Exact log density of x at t=1 for the VP forward SDE.
     
-    For sub-VP SDE with initial distribution N(μ, Σ), at t=1:
-    x₁ ~ N(sqrt(α̅(1)) * μ, α̅(1) * Σ + (1 - exp(-2∫β)) * I)
+    If x0 ~ N(μ, Σ), then for VP-SDE at t=1:
+    x₁ ~ N(sqrt(α̅(1)) * μ, α̅(1) * Σ + (1 - α̅(1)) * I)
     """
     device = x.device
     dtype = x.dtype
-    sde_type = config.get("sde_type", "subvp").lower()
-    if sde_type != "subvp":
-        raise ValueError("terminal_logp_gaussian now supports only sub-VP SDE.")
-    
+
     dim = x.shape[1]
     eye = torch.eye(dim, device=device, dtype=dtype)
-    
-    # Get parameters
+
+    # Parameters
     beta_min = config["beta_min"]
     beta_max = config["beta_max"]
     mu = torch.tensor(config["mu"], device=device, dtype=dtype)
     sigma = torch.tensor(config["sigma"], device=device, dtype=dtype)
-    
-    # Compute α̅(1) = exp(-∫₀¹ β(s)ds)
+
+    # α̅(1) = exp(-∫₀¹ β(s) ds)
     t_terminal = torch.tensor(1.0, device=device, dtype=dtype)
-    lambda_1 = integral_beta(t_terminal, beta_min, beta_max)
     alpha_bar_1 = alpha_bar(t_terminal, beta_min, beta_max)
-    
-    # Compute noise variance: 1 - exp(-2∫₀¹ β(s)ds)
-    noise_var = 1.0 - torch.exp(-2.0 * lambda_1)
-    
-    # Terminal mean: sqrt(α̅(1)) * μ
+
+    # VP noise variance: 1 - α̅(1)
+    noise_var = 1.0 - alpha_bar_1
+
+    # Terminal mean and covariance
     mean_1 = torch.sqrt(alpha_bar_1) * mu
-    
-    # Terminal covariance: α̅(1) * Σ + noise_var * I
     cov_1 = alpha_bar_1 * sigma + noise_var * eye
-    
-    # Compute log probability
+
+    # Log probability under N(mean_1, cov_1)
     cov_inv = torch.inverse(cov_1)
     diff = x - mean_1
     exponent = (diff @ cov_inv * diff).sum(dim=1)
     log_det = torch.logdet(cov_1)
-    
     return -0.5 * (exponent + log_det + dim * math.log(2.0 * math.pi))
 
 
@@ -159,10 +138,6 @@ def divergence_exact(v: torch.Tensor, x_req: torch.Tensor) -> torch.Tensor:
         )[0]
         terms.append(grad_j[:, j])
     return torch.stack(terms, dim=1).sum(dim=1)
-
-
-
-
 
 @torch.no_grad()
 def probability_flow_sample(

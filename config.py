@@ -11,15 +11,15 @@ config = {
     "beta_max": 20.0,
     "sde_type": "subvp",
     "eps": 1e-3,
-    "hidden": 256,  # 从128增加到256
-    "layers": 10,   # 从8增加到10
-    "t_embed_dim": 256,
+    "hidden": 64,  # 从128增加到256
+    "layers": 3,   # 从8增加到10
+    "t_embed_dim": 64,
     "batch_size": 128,
-    "epochs": 2000,  # 训练更久
+    "epochs": 100000,  # 训练更久
     "lr": 1e-3,      # 降低学习率，更稳定
     "weight_decay": 1e-4,
-    "clip_grad_norm": 1.0,
-    "lambda_gamma": 0.5,  # 降低权重的影响，更平衡地训练所有时间步
+    "clip_grad_norm": 5.0,
+    "lambda_gamma": 1.0,  # 降低权重的影响，更平衡地训练所有时间步
     "num_steps": 5000,
     "snr": 0.08,
     "corrector_steps": 2,

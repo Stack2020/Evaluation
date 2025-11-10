@@ -82,6 +82,7 @@ def main() -> None:
 
     with torch.no_grad():
         pc_samples = pc_sample(model, checkpoint_config, device, checkpoint_config["n_gen"]).cpu().numpy()
+        
         pf_samples = pf_sample(model, checkpoint_config, device, checkpoint_config["n_gen"]).cpu().numpy()
         oracle_samples = oracle_sample(
             checkpoint_config,
