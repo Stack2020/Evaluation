@@ -2,7 +2,6 @@ import warnings
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-
 from config import config, get_device
 from data_loader import generate_test
 from model import build_model
@@ -13,9 +12,7 @@ from sample import (
     pf_sample,
     report_statistics,
 )
-
 warnings.filterwarnings("ignore")
-
 
 def show_sample_scatter(
     true_samples: np.ndarray,

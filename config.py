@@ -5,8 +5,12 @@ config = {
     "n_val": 10000,
     "n_test": 5000,
     "n_gen": 5000,
+    #anisotropic
     "mu": [1.0, -1.0],
     "sigma": [[1.0, 0.6], [0.6, 1.5]],
+    #isotropic
+    #"mu": [0.0, 0.0],
+    #"sigma": [[1.0, 0.0], [0.0, 1]],
     "beta_min": 0.1,
     "beta_max": 20.0,
     "eps": 1e-3,
@@ -21,7 +25,7 @@ config = {
     "layers": 3,   # 从8增加到10
     "t_embed_dim": 64,
     "batch_size": 128,
-    "epochs": 2000,  # 训练更久
+    "epochs": 3000,  # 训练更久
     "lr": 1e-3,      # 降低学习率，更稳定
     "weight_decay": 1e-4,
     "clip_grad_norm": 5.0,
