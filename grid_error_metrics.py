@@ -12,7 +12,7 @@ import torch
 from config import config, get_device
 from model import build_model
 from sample import load_checkpoint
-from util import integrate_log_probability
+from util import integrate_log_probability, set_seed
 
 # === User-editable settings ===================================================
 CHECKPOINT_PATH: Path = Path(config["config_path"])
@@ -124,6 +124,9 @@ def compute_metrics_for_checkpoint(
 
 
 def main() -> None:
+    seed = int(config.get("seed", 42))
+    set_seed(seed)
+
     device = get_device()
 
     grid_points = build_grid(
@@ -135,8 +138,6 @@ def main() -> None:
     cov = np.asarray(config["sigma"], dtype=np.float64)
     analytic_log_density = gaussian_log_density(grid_points, mean, cov)
 
-    torch.manual_seed(0)
-    np.random.seed(0)
     print(f"Evaluating checkpoint {CHECKPOINT_PATH} ...")
     result = compute_metrics_for_checkpoint(
         CHECKPOINT_PATH,

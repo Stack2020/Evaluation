@@ -12,6 +12,7 @@ from sample import (
     pf_sample,
     report_statistics,
 )
+from util import set_seed
 warnings.filterwarnings("ignore")
 
 def show_sample_scatter(
@@ -19,6 +20,7 @@ def show_sample_scatter(
     generated_samples: np.ndarray,
     method_label: str,
 ) -> None:
+    
     """Display real vs generated samples with shared axes for easy comparison."""
     true_samples = np.asarray(true_samples, dtype=float)
     generated_samples = np.asarray(generated_samples, dtype=float)
@@ -27,6 +29,7 @@ def show_sample_scatter(
 
     combined = np.vstack([true_samples, generated_samples])
     finite_mask = np.isfinite(combined).all(axis=1)
+
     valid = combined[finite_mask]
 
     if valid.size == 0:
@@ -66,21 +69,27 @@ def show_sample_scatter(
 
 
 def main() -> None:
+    seed = int(config.get("seed", 42))
+    set_seed(seed)
 
     device = get_device()
     if device.type == "cuda":
         print("Using device:", device)
 
     model = build_model(config, device)
+
     config_path = config["config_path"]
+    
     checkpoint = load_checkpoint(model, config_path, device)
     checkpoint_config = checkpoint.get("config", config)
-    test_np = generate_test(checkpoint_config)
+
+    test_np = generate_test(checkpoint_config, seed=seed)
 
     with torch.no_grad():
         pc_samples = pc_sample(model, checkpoint_config, device, checkpoint_config["n_gen"]).cpu().numpy()
         
         pf_samples = pf_sample(model, checkpoint_config, device, checkpoint_config["n_gen"]).cpu().numpy()
+        
         oracle_samples = oracle_sample(
             checkpoint_config,
             device,

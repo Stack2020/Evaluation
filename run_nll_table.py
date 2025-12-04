@@ -12,6 +12,7 @@ from config import config, get_device
 from data_loader import generate_test
 from model import build_model
 from sample import load_checkpoint
+from util import set_seed
 
 def ae_stats(errors: torch.Tensor) -> Tuple[float, float, float, float]:
     """Return mean, std (ddof=1), and 95% CI bounds for absolute errors."""
@@ -41,6 +42,9 @@ def ensure_table_dir(path: Path) -> None:
 
 
 def main() -> None:
+    seed = int(config.get("seed", 42))
+    set_seed(seed)
+
     device = get_device()
     model = build_model(config, device)
     checkpoint = load_checkpoint(model, config["config_path"] if "config_path" in config else "vp_sde_2d_best.pt", device)

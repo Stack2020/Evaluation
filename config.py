@@ -1,5 +1,6 @@
 import torch
 config = {
+    "seed": 42,
     "n_gen":60000,
     "n_train": 50000,
     "n_val": 10000,

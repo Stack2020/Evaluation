@@ -6,7 +6,7 @@ from config import config, get_device
 from data_loader import generate_test
 from model import build_model
 from sample import load_checkpoint
-from util import integrate_log_probability
+from util import integrate_log_probability, set_seed
 
 def gaussian_log_density(points: np.ndarray, mean: np.ndarray, cov: np.ndarray) -> np.ndarray:
     """Compute log-density of a multivariate Gaussian at given points."""
@@ -53,6 +53,9 @@ def evaluate_model_log_density(
 
 
 def main() -> None:
+    seed = int(config.get("seed", 42))
+    set_seed(seed)
+
     device = get_device()
     model = build_model(config, device)
     checkpoint = load_checkpoint(model, config["config_path"], device)
@@ -60,7 +63,7 @@ def main() -> None:
     for key, value in config.items():
         checkpoint_config.setdefault(key, value)
     print("Using configuration:", checkpoint_config)
-    test_np = generate_test(checkpoint_config)
+    test_np = generate_test(checkpoint_config, seed=seed)
     max_points = int(checkpoint_config.get("density_eval_points", test_np.shape[0]))
     eval_np = test_np[:max(1, min(max_points, test_np.shape[0]))]
 

@@ -1,4 +1,5 @@
 from typing import Dict, Iterable
+import random
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.ticker import MaxNLocator
@@ -10,6 +11,16 @@ from sde import (
     divergence_exact,
     terminal_logp_gaussian
     )
+
+
+def set_seed(seed: int) -> None:
+    """Seed Python, NumPy, and PyTorch (CPU/CUDA) for reproducibility."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 def build_time_grid(
