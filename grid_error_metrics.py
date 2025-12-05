@@ -23,7 +23,6 @@ METHOD: str | None = "Heun"
 STEPS_OVERRIDE: int | None = None
 EPS_OVERRIDE: float | None = None
 
-
 def gaussian_log_density(points: np.ndarray, mean: np.ndarray, cov: np.ndarray) -> np.ndarray:
     cov_inv = np.linalg.inv(cov)
     diff = points - mean
