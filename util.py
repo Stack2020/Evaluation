@@ -1,4 +1,5 @@
 from typing import Dict, Iterable
+import random
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.ticker import MaxNLocator
@@ -6,10 +7,19 @@ import torch
 from sde import (
     dsm_loss_batch,
     drift_pf,
-    prior_logp_standard_normal,
     divergence_exact,
     terminal_logp_gaussian
     )
+
+
+def set_seed(seed: int) -> None:
+    """Seed Python, NumPy, and PyTorch (CPU/CUDA) for reproducibility."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 def build_time_grid(
@@ -45,7 +55,6 @@ def integrate_log_probability(
     device, dtype = x0.device, x0.dtype
     batch = x0.shape[0]
     ts = build_time_grid(steps, eps_val, device, dtype, config)
-    #差分
     dts = ts[1:] - ts[:-1]
     x = x0.detach()
     accum = torch.zeros(batch, device=device, dtype=dtype)

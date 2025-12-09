@@ -17,13 +17,15 @@ config = {
 
     "density_eval_points": 2000,
     "density_eval_steps": 600,
+    
     "nll_time_schedule": "power",
     "nll_time_gamma": 2.5,
     "loss_time_gamma": 2.2,
     "loss_time_reweight": False,
     "loss_time_weight_max": 0.0,
-    "hidden": 64,
-    "layers": 3,
+
+    "hidden": 128,
+    "layers": 5,
     "t_embed_dim": 64,
     "batch_size": 128,
     "epochs": 3000,

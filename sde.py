@@ -77,7 +77,7 @@ def forward_perturb(
 
 
 def dsm_loss_batch(model, x0: torch.Tensor, config: Dict) -> torch.Tensor:
-    """v-prediction loss for VP-SDE."""
+    """v-prediction loss for vp."""
     beta_min, beta_max = config["beta_min"], config["beta_max"]
     batch = x0.shape[0]
     eps = float(config.get("eps", 1e-3))
