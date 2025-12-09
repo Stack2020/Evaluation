@@ -4,15 +4,17 @@ config = {
     "n_train": 50000,
     "n_val": 10000,
     "n_test": 5000,
-    # anisotropic
-    "mu": [1.0, -1.0],
-    "sigma": [[1.0, 0.6], [0.6, 1.5]],
-    # isotropic (reference)
-    # "mu": [0.0, 0.0],
-    # "sigma": [[1.0, 0.0], [0.0, 1.0]],
+    # data distribution
+    "data_distribution": "involute",
+    "noise_scale": 0.4,
+
+    "mu": [-0.5, 0.0],
+    "sigma": [[6.42, -0.8], [-0.8, 6.82]],
+
     "beta_min": 0.1,
     "beta_max": 20.0,
     "eps": 1e-3,
+
     "density_eval_points": 2000,
     "density_eval_steps": 600,
     "nll_time_schedule": "power",
@@ -34,15 +36,16 @@ config = {
     "corrector_steps": 2,
     "scatter_alpha": 0.5,
     "scatter_size": 10,
-    "config_path": "vp_sde_2d_best.pt",
+    "config_path": "vp_sde_involute_best.pt",
     # ===== reproducibility =====
     "deterministic": True,
-    "train_seeds": [0, 1, 2, 3, 4],
+    "train_seeds": 42,
+    "seed": 42,
     "data_seed_offset": 10_000,
     "loader_seed_offset": 20_000,
     "eval_seed_offset": 30_000,
     "sample_seed_offset": 40_000,
-    "loader_workers": 2,
+    "loader_workers": 2
 }
 
 

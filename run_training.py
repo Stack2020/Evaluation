@@ -21,10 +21,12 @@ def format_checkpoint_path(base_path: str, seed: int) -> str:
 
 def iter_train_seeds(cfg: dict) -> Iterable[int]:
     seeds = cfg.get("train_seeds")
-    if seeds:
-        return [int(s) for s in seeds]
-    base_seed = int(cfg.get("seed", 0))
-    return [base_seed]
+    if seeds is None:
+        base_seed = int(cfg.get("seed", 0))
+        return [base_seed]
+    if isinstance(seeds, (int, float)):
+        return [int(seeds)]
+    return [int(s) for s in seeds]
 
 
 def train_one_seed(base_cfg: dict, device: torch.device, seed: int) -> None:

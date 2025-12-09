@@ -242,6 +242,17 @@ def compute_time_series(residual: np.ndarray) -> tuple[np.ndarray, np.ndarray, n
     return spatial_mean, mean_abs, max_abs
 
 
+def calculate_spatial_time_score(rot_residual: np.ndarray) -> float:
+    """
+    Compute the space-time aggregated rotational residual (Eq. 29):
+    sqrt( mean_t mean_x R_rot(x, t)^2 ).
+    """
+    if rot_residual.ndim < 3:
+        raise ValueError("rot_residual must have shape (T, H, W) or (T, H, W, ...).")
+    spatial_mean_sq = np.mean(np.square(rot_residual), axis=(1, 2))
+    return float(np.sqrt(np.mean(spatial_mean_sq)))
+
+
 def compute_value_bounds(
     residual: np.ndarray,
     lower_quantile: float,
@@ -687,6 +698,9 @@ def main() -> None:
         dpi=args.dpi,
     )
     print(f"Saved spatial-mean time series to {args.stats_figure}")
+
+    agg_score = calculate_spatial_time_score(rot_residual)
+    print(f"Space-time RMS rotational residual (Eq. 29): {agg_score:.6e}")
 
 
 if __name__ == "__main__":

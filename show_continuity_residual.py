@@ -68,6 +68,7 @@ def parse_args() -> argparse.Namespace:
     )
 
     viz_group = parser.add_argument_group("visualization")
+    
     viz_group.add_argument(
         "--visualize-time",
         type=float,
