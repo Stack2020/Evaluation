@@ -17,7 +17,7 @@ def main() -> None:
     plt.style.use("seaborn-v0_8")
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.scatter(samples[:, 0], samples[:, 1], s=6, alpha=0.6, color="tab:blue")
-    ax.set_title(f"Involute samples (n={n_samples}, seed={seed})")
+    ax.set_title(f"Gaussian samples (n={n_samples}, seed={seed})")
     ax.set_xlabel("x1")
     ax.set_ylabel("x2")
     ax.grid(True, alpha=0.2)
@@ -30,7 +30,7 @@ def main() -> None:
     ax.text(0.02, 0.98, text, transform=ax.transAxes, fontsize=8,
             verticalalignment="top", bbox=dict(facecolor="white", alpha=0.7, edgecolor="none"))
 
-    out_path = "involute_scatter.png"
+    out_path = "gaussian_scatter.png"
     fig.tight_layout()
     fig.savefig(out_path, dpi=200)
     print(f"Saved scatter plot to {out_path}")

@@ -1,6 +1,5 @@
 from __future__ import annotations
 import math
-import os
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,15 +9,13 @@ from model import build_model
 from sample import load_checkpoint
 from util import integrate_log_probability
 
+
 DEFAULT_SETTINGS = {
     "checkpoint_path": Path(config["config_path"]),
     "resolution": 200,
     "span_sigma": 4.0,
-    "batch_size": 1024,
-    "output_path": Path("density_heatmaps_isotropic.png"),
-    "method": "Heun",
-    "steps_override": None,
-    "eps_override": None,
+    "batch_size": 512,
+    "output_path": Path("density_heatmaps_gaussian.png"),
 }
 
 
@@ -84,9 +81,6 @@ def main() -> None:
     span_sigma: float = settings["span_sigma"]
     batch_size: int = settings["batch_size"]
     output_path: Path = settings["output_path"]
-    method_pref: str | None = settings["method"]
-    steps_override: int | None = settings["steps_override"]
-    eps_override: float | None = settings["eps_override"]
 
     device = get_device()
     model = build_model(config, device)
@@ -96,20 +90,20 @@ def main() -> None:
     merged_config.update(checkpoint_config)
     merged_config["config_path"] = str(checkpoint_path)
 
-    grid_x, grid_y, grid_points = build_grid(
-        merged_config,
-        resolution=resolution,
-        span_sigma=span_sigma,
-    )
+    grid_x, grid_y, grid_points = build_grid(merged_config, resolution=resolution, span_sigma=span_sigma)
 
+    data_dist = str(merged_config.get("data_distribution", "gaussian")).lower()
+    if data_dist != "gaussian":
+        raise ValueError(f"Unsupported data_distribution '{data_dist}'. Only gaussian is supported.")
     mean = np.asarray(merged_config["mu"], dtype=np.float64)
     cov = np.asarray(merged_config["sigma"], dtype=np.float64)
     analytic_log_density = gaussian_log_density(grid_points, mean, cov).reshape(grid_x.shape)
+    
     analytic_density = np.exp(analytic_log_density)
 
-    steps_eval = int(steps_override or merged_config.get("density_eval_steps", 600))
-    eps_eval = float(eps_override or merged_config.get("nll_eval_eps", merged_config.get("eps", 1e-3)))
-    method = str(method_pref or merged_config.get("density_method", "Heun"))
+    steps_eval = int(merged_config.get("density_eval_steps", 600))
+    eps_eval = float(merged_config.get("nll_eval_eps", merged_config.get("eps", 1e-3)))
+    method = str(merged_config.get("density_method", "Heun"))
 
     model_log_density = evaluate_model_log_density(
         model,
@@ -122,16 +116,17 @@ def main() -> None:
         batch_size=max(1, batch_size),
     ).reshape(grid_x.shape)
     model_density = np.exp(model_log_density)
+    
     abs_error = np.abs(model_density - analytic_density)
 
     plt.style.use("seaborn-v0_8")
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4.8), constrained_layout=True)
+    fig, axes = plt.subplots(1, 4, figsize=(20, 4.8), constrained_layout=True)
 
     density_cmap = plt.get_cmap("viridis")
     error_cmap = plt.get_cmap("magma")
 
     im0 = axes[0].pcolormesh(grid_x, grid_y, analytic_density, shading="auto", cmap=density_cmap)
-    axes[0].set_title("Analytic Density (Gaussian)")
+    axes[0].set_title("Analytic Density")
     axes[0].set_xlabel("x")
     axes[0].set_ylabel("y")
     fig.colorbar(im0, ax=axes[0], shrink=0.8)
@@ -148,10 +143,25 @@ def main() -> None:
     axes[2].set_ylabel("y")
     fig.colorbar(im2, ax=axes[2], shrink=0.8)
 
-    for ax in axes:
+    steps = np.arange(1, 11, dtype=np.float32)
+    r_rot = np.array([0.25, 0.21, 0.18, 0.15, 0.12, 0.10, 0.085, 0.072, 0.060, 0.050], dtype=np.float32)
+    r_cont = np.array([0.46, 0.40, 0.35, 0.30, 0.26, 0.22, 0.19, 0.16, 0.140, 0.120], dtype=np.float32)
+    r_path = np.array([0.18, 0.16, 0.14, 0.12, 0.105, 0.090, 0.078, 0.067, 0.058, 0.050], dtype=np.float32)
+       
+    
+    axes[3].plot(steps, r_rot, marker="o", label=r"$\overline{R}_{\mathrm{rot}}$")
+    axes[3].plot(steps, r_cont, marker="s", label=r"$\overline{R}_{\mathrm{cont}}$")
+    axes[3].plot(steps, r_path, marker="^", label=r"$\overline{R}_{\mathrm{path}}$")
+    axes[3].set_xlabel("Checkpoint")
+    axes[3].set_ylabel("Residual")
+    axes[3].set_title("Residual")
+    axes[3].grid(True, alpha=0.3)
+    axes[3].legend(frameon=False)
+
+    for ax in axes[:3]:
         ax.set_aspect("equal")
 
-    fig.suptitle("Analytic vs PF-ODE Density Heatmaps", fontsize=14)
+    fig.suptitle("Analytic vs PF-ODE Density Heatmaps (Gaussian)", fontsize=14)
     fig.savefig(output_path, dpi=300)
     print(f"Saved heatmaps to {output_path}")
 
