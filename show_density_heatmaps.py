@@ -93,6 +93,8 @@ def main() -> None:
     grid_x, grid_y, grid_points = build_grid(merged_config, resolution=resolution, span_sigma=span_sigma)
 
     data_dist = str(merged_config.get("data_distribution", "gaussian")).lower()
+    
+    
     if data_dist != "gaussian":
         raise ValueError(f"Unsupported data_distribution '{data_dist}'. Only gaussian is supported.")
     mean = np.asarray(merged_config["mu"], dtype=np.float64)
@@ -120,15 +122,20 @@ def main() -> None:
     abs_error = np.abs(model_density - analytic_density)
 
     plt.style.use("seaborn-v0_8")
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.8), constrained_layout=True)
+    heatmap_path = output_path
+    residual_path = output_path.with_name(f"{output_path.stem}_residuals{output_path.suffix}")
 
+    # Absolute error heatmap
+    fig_heatmap, ax_heatmap = plt.subplots(1, 1, figsize=(4.5, 3.6), constrained_layout=True)
     error_cmap = plt.get_cmap("magma")
-
-    im = axes[0].pcolormesh(grid_x, grid_y, abs_error, shading="auto", cmap=error_cmap)
-    axes[0].set_title("Absolute Error")
-    axes[0].set_xlabel("x")
-    axes[0].set_ylabel("y")
-    fig.colorbar(im, ax=axes[0], shrink=0.8)
+    im = ax_heatmap.pcolormesh(grid_x, grid_y, abs_error, shading="auto", cmap=error_cmap)
+    ax_heatmap.set_title("Absolute Error")
+    ax_heatmap.set_xlabel("x")
+    ax_heatmap.set_ylabel("y")
+    fig_heatmap.colorbar(im, ax=ax_heatmap, shrink=0.7)
+    ax_heatmap.set_aspect("equal")
+    fig_heatmap.suptitle("Absolute Error Heatmap (Gaussian)", fontsize=12)
+    fig_heatmap.savefig(heatmap_path, dpi=300)
 
     steps = np.arange(1, 11, dtype=np.float32)
     r_rot = np.array([0.25, 0.21, 0.18, 0.15, 0.12, 0.10, 0.085, 0.072, 0.060, 0.050], dtype=np.float32)
@@ -136,20 +143,20 @@ def main() -> None:
     r_path = np.array([0.18, 0.16, 0.14, 0.12, 0.105, 0.090, 0.078, 0.067, 0.058, 0.050], dtype=np.float32)
        
     
-    axes[1].plot(steps, r_rot, marker="o", label=r"$\overline{R}_{\mathrm{rot}}$")
-    axes[1].plot(steps, r_cont, marker="s", label=r"$\overline{R}_{\mathrm{cont}}$")
-    axes[1].plot(steps, r_path, marker="^", label=r"$\overline{R}_{\mathrm{path}}$")
-    axes[1].set_xlabel("Checkpoint")
-    axes[1].set_ylabel("Residual")
-    axes[1].set_title("Residual Across 10 Checkpoints")
-    axes[1].grid(True, alpha=0.3)
-    axes[1].legend(frameon=False)
+    fig_residual, ax_residual = plt.subplots(1, 1, figsize=(4.5, 3.6), constrained_layout=True)
+    ax_residual.plot(steps, r_rot, marker="o", label=r"$\overline{R}_{\mathrm{rot}}$")
+    ax_residual.plot(steps, r_cont, marker="s", label=r"$\overline{R}_{\mathrm{cont}}$")
+    ax_residual.plot(steps, r_path, marker="^", label=r"$\overline{R}_{\mathrm{path}}$")
+    ax_residual.set_xlabel("Checkpoint")
+    ax_residual.set_ylabel("Residual")
+    ax_residual.set_title("Residual Across 10 Checkpoints")
+    ax_residual.grid(True, alpha=0.3)
+    ax_residual.legend(frameon=False)
+    fig_residual.suptitle("Residual Curves (Gaussian)", fontsize=12)
+    fig_residual.savefig(residual_path, dpi=300)
 
-    axes[0].set_aspect("equal")
-
-    fig.suptitle("Absolute Error Heatmap and Residuals (Gaussian)", fontsize=14)
-    fig.savefig(output_path, dpi=300)
-    print(f"Saved heatmaps to {output_path}")
+    print(f"Saved absolute error heatmap to {heatmap_path}")
+    print(f"Saved residual plot to {residual_path}")
 
 
 if __name__ == "__main__":
