@@ -120,28 +120,15 @@ def main() -> None:
     abs_error = np.abs(model_density - analytic_density)
 
     plt.style.use("seaborn-v0_8")
-    fig, axes = plt.subplots(1, 4, figsize=(20, 4.8), constrained_layout=True)
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.8), constrained_layout=True)
 
-    density_cmap = plt.get_cmap("viridis")
     error_cmap = plt.get_cmap("magma")
 
-    im0 = axes[0].pcolormesh(grid_x, grid_y, analytic_density, shading="auto", cmap=density_cmap)
-    axes[0].set_title("Analytic Density")
+    im = axes[0].pcolormesh(grid_x, grid_y, abs_error, shading="auto", cmap=error_cmap)
+    axes[0].set_title("Absolute Error")
     axes[0].set_xlabel("x")
     axes[0].set_ylabel("y")
-    fig.colorbar(im0, ax=axes[0], shrink=0.8)
-
-    im1 = axes[1].pcolormesh(grid_x, grid_y, model_density, shading="auto", cmap=density_cmap)
-    axes[1].set_title("PF-ODE Density")
-    axes[1].set_xlabel("x")
-    axes[1].set_ylabel("y")
-    fig.colorbar(im1, ax=axes[1], shrink=0.8)
-
-    im2 = axes[2].pcolormesh(grid_x, grid_y, abs_error, shading="auto", cmap=error_cmap)
-    axes[2].set_title("Absolute Error")
-    axes[2].set_xlabel("x")
-    axes[2].set_ylabel("y")
-    fig.colorbar(im2, ax=axes[2], shrink=0.8)
+    fig.colorbar(im, ax=axes[0], shrink=0.8)
 
     steps = np.arange(1, 11, dtype=np.float32)
     r_rot = np.array([0.25, 0.21, 0.18, 0.15, 0.12, 0.10, 0.085, 0.072, 0.060, 0.050], dtype=np.float32)
@@ -149,19 +136,18 @@ def main() -> None:
     r_path = np.array([0.18, 0.16, 0.14, 0.12, 0.105, 0.090, 0.078, 0.067, 0.058, 0.050], dtype=np.float32)
        
     
-    axes[3].plot(steps, r_rot, marker="o", label=r"$\overline{R}_{\mathrm{rot}}$")
-    axes[3].plot(steps, r_cont, marker="s", label=r"$\overline{R}_{\mathrm{cont}}$")
-    axes[3].plot(steps, r_path, marker="^", label=r"$\overline{R}_{\mathrm{path}}$")
-    axes[3].set_xlabel("Checkpoint")
-    axes[3].set_ylabel("Residual")
-    axes[3].set_title("Residual")
-    axes[3].grid(True, alpha=0.3)
-    axes[3].legend(frameon=False)
+    axes[1].plot(steps, r_rot, marker="o", label=r"$\overline{R}_{\mathrm{rot}}$")
+    axes[1].plot(steps, r_cont, marker="s", label=r"$\overline{R}_{\mathrm{cont}}$")
+    axes[1].plot(steps, r_path, marker="^", label=r"$\overline{R}_{\mathrm{path}}$")
+    axes[1].set_xlabel("Checkpoint")
+    axes[1].set_ylabel("Residual")
+    axes[1].set_title("Residual Across 10 Checkpoints")
+    axes[1].grid(True, alpha=0.3)
+    axes[1].legend(frameon=False)
 
-    for ax in axes[:3]:
-        ax.set_aspect("equal")
+    axes[0].set_aspect("equal")
 
-    fig.suptitle("Analytic vs PF-ODE Density Heatmaps (Gaussian)", fontsize=14)
+    fig.suptitle("Absolute Error Heatmap and Residuals (Gaussian)", fontsize=14)
     fig.savefig(output_path, dpi=300)
     print(f"Saved heatmaps to {output_path}")
 
