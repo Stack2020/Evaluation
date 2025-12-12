@@ -2,13 +2,14 @@ from typing import Dict
 import torch
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
-from sde import dsm_loss_batch, forward_perturb, v_to_score, drift_pf
-from util import evaluation_loss
+from sde import dsm_loss_batch
+from util import evaluation_loss, evaluation_nll
 
 def build_scheduler_after_reset(optimizer, config, remaining_epochs: int):
     eta_min = float(config.get("lr_min", 1e-6))          # 比 0.1*lr 更激进
     T_max_after = int(config.get("T_max_after_reset", min(30, max(1, remaining_epochs))))
     return CosineAnnealingLR(optimizer, T_max=max(1, T_max_after), eta_min=eta_min)
+
 
 class EMA:
     def __init__(self, model: torch.nn.Module, decay: float = 0.999):
@@ -61,9 +62,9 @@ def train_model(
     train_loader,
     val_loader,
     checkpoint_path: str,
+    enable_nll: bool = False,
 ) -> None:
-    lambda_curl = float(config.get("lambda_curl", 0.0))
-    lambda_cont = float(config.get("lambda_cont", 0.0))
+
     # ----- Optimizer -----
     optimizer = AdamW(
         model.parameters(),
@@ -93,6 +94,7 @@ def train_model(
 
     # ----- Early stop / plateau 控制 -----
     best_metric = float("inf")
+    metric_name = "nll" if enable_nll else "loss"
 
     patience = int(config.get("degradation_patience",100))
     min_delta = float(config.get("min_improve_delta", 0.0))
@@ -117,51 +119,6 @@ def train_model(
             xb = xb.to(device, non_blocking=True)
 
             loss = dsm_loss_batch(model, xb, config)
-            
-            if lambda_curl > 0.0 or lambda_cont > 0.0:
-                eps = float(config.get("eps", 1e-3))
-                gamma = float(config.get("loss_time_gamma", 1.0))
-                u = torch.rand(xb.shape[0], device=xb.device, dtype=xb.dtype)
-                if abs(gamma - 1.0) < 1e-6:
-                    t = eps + (1.0 - eps) * u
-                else:
-                    t = eps + (1.0 - eps) * torch.pow(u, gamma)
-                xt, _, _ = forward_perturb(xb, t, config["beta_min"], config["beta_max"])
-                xt = xt.detach().requires_grad_(True)
-                with torch.enable_grad():
-                    score = v_to_score(model(xt, t), xt, t, config)
-                    if lambda_curl > 0.0:
-                        jac_rows = []
-                        for comp in range(score.shape[1]):
-                            grad = torch.autograd.grad(
-                                outputs=score[:, comp].sum(),
-                                inputs=xt,
-                                retain_graph=True,
-                                create_graph=True,
-                                allow_unused=False,
-                            )[0]
-                            jac_rows.append(grad.unsqueeze(1))
-                        jac = torch.cat(jac_rows, dim=1)
-                        curl_pen = ((jac - jac.transpose(1, 2)) ** 2).sum(dim=(1, 2)).mean()
-                        loss = loss + lambda_curl * curl_pen
-                    
-                    if lambda_cont > 0.0:
-                        velocity = drift_pf(model, xt, t, config)
-                        div_terms = []
-                        for j in range(velocity.shape[1]):
-                            grad_j = torch.autograd.grad(
-                                outputs=velocity[:, j].sum(),
-                                inputs=xt,
-                                retain_graph=True,
-                                create_graph=True,
-                                allow_unused=False,
-                            )[0]
-                            div_terms.append(grad_j[:, j])
-                        divergence = torch.stack(div_terms, dim=1).sum(dim=1)
-                        conv = (velocity * score).sum(dim=1)
-                        cont_pen = (divergence + conv).pow(2).mean()
-                        loss = loss + lambda_cont * cont_pen
-
             optimizer.zero_grad(set_to_none=True)
             
             loss.backward()
@@ -188,7 +145,6 @@ def train_model(
                     f"train_loss {loss.item():.4f} "
                     f"grad_norm {grad_norm_val:.4f} "
                 )
-            
 
         train_loss = running / num_batches
 
@@ -199,7 +155,10 @@ def train_model(
             ema.apply_shadow(model)
 
         with torch.no_grad():
-            val_metric = evaluation_loss(model, val_loader, device, config)
+            if enable_nll:
+                val_metric = evaluation_nll(model, val_loader, device, config)
+            else:
+                val_metric = evaluation_loss(model, val_loader, device, config)
         if ema is not None:
             ema.restore(model)
         if model_was_training:
@@ -208,7 +167,6 @@ def train_model(
         if val_metric < best_metric - min_delta:
             best_metric = float(val_metric)
             to_save = ema.ema_state_dict(model) if ema is not None else model.state_dict()
-            
             torch.save(
                 {
                     "model": to_save,
@@ -216,7 +174,8 @@ def train_model(
                     "optimizer": optimizer.state_dict(),
                     "scheduler": scheduler.state_dict(),
                     "epoch": epoch,
-                    "best_metric": best_metric
+                    "best_metric": best_metric,
+                    "metric_name": metric_name,
                 },
                 checkpoint_path,
             )
@@ -248,14 +207,16 @@ def train_model(
         curr_lr = scheduler.get_last_lr()[0]
 
         print(
-            f"Epoch {epoch:03d} | train {train_loss:.4f} | val_loss {val_metric:.4f} "
-            f"| best_loss {best_metric:.4f} | lr {curr_lr:.2e} "
+            f"Epoch {epoch:03d} | train {train_loss:.4f} | val_{metric_name} {val_metric:.4f} "
+            f"| best_{metric_name} {best_metric:.4f} | lr {curr_lr:.2e} "
             f"| degraded {degraded} ({epochs_no_improve}/{patience})"
         )
 
         # ----- 目标提前停止（仅 loss 模式）-----
-        if val_metric <= target_loss:
-            print(f"Target reached: val_loss <= {target_loss:.4f}. Stopping early at epoch {epoch}.")
+        if not enable_nll and val_metric <= target_loss:
+            print(
+                f"Target reached: val_loss <= {target_loss:.4f}. Stopping early at epoch {epoch}."
+            )
             break
 
-    print(f"Best checkpoint: {checkpoint_path} best_loss={best_metric:.4f}")
+    print(f"Best checkpoint: {checkpoint_path} best_{metric_name}={best_metric:.4f}")

@@ -6,19 +6,45 @@ import torch
 
 from config import config, get_device
 from data_loader import generate_test
+from gmm_data_loader import GMM_DATA, generate_test as generate_gmm_test
 from model import build_model
 from sample import load_checkpoint
 from util import integrate_log_probability
 
 
-def gaussian_log_density(points: np.ndarray, mean: np.ndarray, cov: np.ndarray) -> np.ndarray:
-    """Analytic log-density of a multivariate Gaussian."""
-    cov_inv = np.linalg.inv(cov)
-    diff = points - mean
-    exponent = np.einsum("...i,ij,...j->...", diff, cov_inv, diff)
-    dim = mean.shape[0]
-    log_norm = -0.5 * (dim * math.log(2.0 * math.pi) + np.log(np.linalg.det(cov)))
-    return log_norm - 0.5 * exponent
+def gmm_gaussian_log_density(
+    points: np.ndarray,
+    mixture: dict[str, np.ndarray] | None = None,
+) -> np.ndarray:
+    """Analytic log-density of a Gaussian mixture."""
+    mixture = GMM_DATA if mixture is None else mixture
+
+    means = np.asarray(mixture["means"], dtype=np.float64)
+    covariances = np.asarray(mixture["covariances"], dtype=np.float64)
+    weights = mixture.get("weights")
+    num_components = means.shape[0]
+
+    if weights is None:
+        weights_arr = np.full(num_components, 1.0 / num_components, dtype=np.float64)
+    else:
+        weights_arr = np.asarray(weights, dtype=np.float64)
+        weights_arr = weights_arr / weights_arr.sum()
+
+    log_components = []
+    for mean, cov, weight in zip(means, covariances, weights_arr):
+        # Log-density of a single Gaussian component
+        sign, logdet = np.linalg.slogdet(cov)
+        if sign <= 0:
+            raise ValueError("Covariance must be positive definite.")
+        diff = points - mean
+        exponent = np.einsum("...i,ij,...j->...", diff, np.linalg.inv(cov), diff)
+        dim = mean.shape[0]
+        log_norm = -0.5 * (dim * math.log(2.0 * math.pi) + logdet)
+        component_log = log_norm - 0.5 * exponent + math.log(weight)
+        log_components.append(component_log)
+
+    stacked = np.stack(log_components, axis=-1)
+    return np.logaddexp.reduce(stacked, axis=-1)
 
 
 def evaluate_model_log_density(
@@ -61,15 +87,23 @@ def main() -> None:
     cfg.update(ckpt_cfg)
     cfg["config_path"] = str(config["config_path"])
 
+    # Gaussian mixture only
+    gmm_means = np.asarray(cfg.get("gmm_means", GMM_DATA["means"]), dtype=np.float64)
+    gmm_covs = np.asarray(cfg.get("gmm_covariances", GMM_DATA["covariances"]), dtype=np.float64)
+    gmm_weights = cfg.get("gmm_weights", GMM_DATA.get("weights"))
+    mixture = {
+        "means": gmm_means,
+        "covariances": gmm_covs,
+        "weights": gmm_weights,
+    }
+    test_np = generate_gmm_test(cfg, seed=int(cfg.get("eval_seed_offset", 0))).astype(np.float32)
+
     # Fixed test set (2D) for all evaluations
-    test_np = generate_test(cfg, seed=int(cfg.get("eval_seed_offset", 0))).astype(np.float32)
     batch_size = int(cfg.get("score_batch_size", 512))
     
-    steps_list: Iterable[int] = (100, 200, 250, 500)
+    steps_list: Iterable[int] = (100, 150, 200, 400)
 
-    mean = np.asarray(cfg["mu"], dtype=np.float64)
-    cov = np.asarray(cfg["sigma"], dtype=np.float64)
-    analytic_logp = gaussian_log_density(test_np.astype(np.float64), mean, cov)
+    analytic_logp = gmm_gaussian_log_density(test_np.astype(np.float64), mixture)
     analytic_nll = float(-analytic_logp.mean())
 
     method = str(cfg.get("density_method", "Heun"))
@@ -92,14 +126,14 @@ def main() -> None:
         # PF-ODE NLL value (expected -log p under the data distribution)
         pf_nll_value = float(-model_logp.mean())
         delta = abs(pf_nll_value - analytic_nll)
-        kl = float((analytic_logp - model_logp).mean())
+        KL = float((analytic_logp - model_logp).mean())
 
         print(
             f"{steps}\t"
             f"{pf_nll_value:.4f}\t"
             f"{analytic_nll:.4f}\t"
             f"{delta:.4f}\t"
-            f"{kl:.4f}"
+            f"{KL:.4f}"
         )
 
 

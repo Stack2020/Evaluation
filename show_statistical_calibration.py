@@ -7,7 +7,7 @@ import numpy as np
 import torch
 
 from config import config as base_config, get_device
-from data_loader import generate_test
+from gmm_data_loader import GMM_DATA, generate_test as generate_gmm_test
 from model import build_model
 from sample import load_checkpoint, pc_sample, pf_sample
 from util import set_seed
@@ -165,11 +165,20 @@ def run_tests(
         "bandwidths": bw,
     }
 
+
+def mixture_mean_cov(means: np.ndarray, covs: np.ndarray, weights: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Compute overall mean/covariance of a Gaussian mixture."""
+    weights = weights / np.clip(weights.sum(), 1e-12, None)
+    mix_mean = (weights[:, None] * means).sum(axis=0)
+    diffs = means - mix_mean
+    mix_cov = (weights[:, None, None] * (covs + np.einsum("bi,bj->bij", diffs, diffs))).sum(axis=0)
+    return mix_mean, mix_cov
+
 #程序入口
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Energy test + Kernel MMD two-sample checks.")
     
-    parser.add_argument("--method", choices=["pc", "pf"], default="pc", help="Sampling method to generate new data.")
+    parser.add_argument("--method", choices=["pc", "pf"], default="pf", help="Sampling method to generate new data.")
     parser.add_argument("--permutations", type=int, default=200, help="Number of permutations for p-value estimation.")
     parser.add_argument("--seed", type=int, default=None, help="Random seed (defaults to config seed).")
     parser.add_argument("--num-gen", type=int, default=None, help="Number of generated samples (default: config n_gen).")
@@ -197,7 +206,8 @@ def main() -> None:
 
     n_gen = int(ckpt_cfg.get("n_gen", 5000) if args.num_gen is None else args.num_gen)
 
-    test_np = generate_test(ckpt_cfg, seed=seed)
+    # Always treat as Gaussian mixture
+    test_np = generate_gmm_test(ckpt_cfg, seed=seed)
 
     with torch.no_grad():
         if args.method == "pf":
@@ -214,8 +224,12 @@ def main() -> None:
     )
 
     n_test = test_np.shape[0]
-    target_mu = np.asarray(ckpt_cfg.get("mu", cfg["mu"]), dtype=np.float64)
-    target_sigma = np.asarray(ckpt_cfg.get("sigma", cfg["sigma"]), dtype=np.float64)
+    means = np.asarray(ckpt_cfg.get("gmm_means", GMM_DATA["means"]), dtype=np.float64)
+    covs = np.asarray(ckpt_cfg.get("gmm_covariances", GMM_DATA["covariances"]), dtype=np.float64)
+    weights = np.asarray(ckpt_cfg.get("gmm_weights", GMM_DATA.get("weights")), dtype=np.float64)
+    if weights.ndim == 0:
+        weights = np.full(means.shape[0], 1.0 / max(1, means.shape[0]), dtype=np.float64)
+    target_mu, target_sigma = mixture_mean_cov(means, covs, weights)
     moment_stats = summarize_moments(gen, target_mu, target_sigma)
 
     energy_stat = max(results["energy_stat"], 0.0)
