@@ -106,6 +106,22 @@ def permutation_test(
     return obs, p_val
 
 
+def summarize_moments(gen_np: np.ndarray, target_mu: np.ndarray, target_sigma: np.ndarray) -> dict:
+    """Compute moment calibration metrics for generated samples."""
+    hat_mu = np.mean(gen_np, axis=0)
+    hat_sigma = np.cov(gen_np, rowvar=False)
+
+    mu_diff = float(np.linalg.norm(hat_mu - target_mu))
+    sigma_diff = float(np.linalg.norm(hat_sigma - target_sigma, ord="fro"))
+    if mu_diff <= 0.0 or sigma_diff <= 0.0:
+        raise ValueError("Moment distance metrics must be positive; check generated samples.")
+
+    return {
+        "mu_diff": mu_diff,
+        "sigma_diff": sigma_diff,
+    }
+
+
 def run_tests(
     test_np: np.ndarray,
     gen_np: np.ndarray,
@@ -198,17 +214,35 @@ def main() -> None:
     )
 
     n_test = test_np.shape[0]
-    bw_str = ",".join(f"{b:.6g}" for b in results["bandwidths"])
+    target_mu = np.asarray(ckpt_cfg.get("mu", cfg["mu"]), dtype=np.float64)
+    target_sigma = np.asarray(ckpt_cfg.get("sigma", cfg["sigma"]), dtype=np.float64)
+    moment_stats = summarize_moments(gen, target_mu, target_sigma)
 
+    energy_stat = max(results["energy_stat"], 0.0)
+    mmd_stat = max(results["mmd_stat"], 0.0)
+
+    header = [
+        "mu_diff_l2",
+        "sigma_diff_fro",
+        "D_E2",
+        "K",
+        "p_E",
+        "p_K",
+    ]
+
+    print("|".join(header))
     print(
-        f"energy|statistic={results['energy_stat']:.6f}|p_value={results['energy_p']:.6f}"
-        f"|permutations={args.permutations}|n_test={n_test}|n_gen={n_gen}|method={args.method}"
+        " ".join(
+            [
+                f"{moment_stats['mu_diff']:.6f}",
+                f"{moment_stats['sigma_diff']:.6f}",
+                f"{energy_stat}",
+                f"{mmd_stat}",
+                f"{results['energy_p']:.6f}",
+                f"{results['mmd_p']:.6f}",
+            ]
+        )
     )
-    print(
-        f"mmd|statistic={results['mmd_stat']:.6f}|p_value={results['mmd_p']:.6f}"
-        f"|permutations={args.permutations}|bandwidths={bw_str}|n_test={n_test}|n_gen={n_gen}|method={args.method}"
-    )
-
-
+   
 if __name__ == "__main__":
     main()

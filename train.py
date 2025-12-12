@@ -130,6 +130,7 @@ def train_model(
             global_step += 1
 
             if ema is not None and global_step >= ema_start_step:
+                
                 ema.update(model)
 
             running += float(loss.item())
