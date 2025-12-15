@@ -1,12 +1,10 @@
 import torch
-
-
 config = {
     "n_gen":60000,
     "n_train": 50000,
     "n_val": 10000,
     "n_test": 5000,
-    "n_gen": 5000,
+    "n_gen": 5000,   
     "seed":42,
     "beta_min": 0.1,
     "beta_max": 20.0,
