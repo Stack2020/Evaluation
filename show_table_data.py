@@ -5,7 +5,7 @@ import numpy as np
 import torch
 
 from config import config, get_device
-from data_loader import generate_test
+from data_loader import banana_log_density, generate_test, get_distribution_stats
 from model import build_model
 from sample import load_checkpoint
 from util import integrate_log_probability
@@ -57,6 +57,7 @@ def main() -> None:
     model = build_model(config, device)
     checkpoint = load_checkpoint(model, str(config["config_path"]), device)
     ckpt_cfg = checkpoint.get("config", {})
+   
     cfg = config.copy()
     cfg.update(ckpt_cfg)
     cfg["config_path"] = str(config["config_path"])
@@ -67,9 +68,13 @@ def main() -> None:
     
     steps_list: Iterable[int] = (100, 200, 250, 500)
 
-    mean = np.asarray(cfg["mu"], dtype=np.float64)
-    cov = np.asarray(cfg["sigma"], dtype=np.float64)
-    analytic_logp = gaussian_log_density(test_np.astype(np.float64), mean, cov)
+    dist = str(cfg.get("distribution", "gaussian")).lower()
+    if dist == "banana":
+        a = float(cfg.get("banana_a", 1.0))
+        analytic_logp = banana_log_density(test_np.astype(np.float64), a)
+    else:
+        mean, cov = get_distribution_stats(cfg)
+        analytic_logp = gaussian_log_density(test_np.astype(np.float64), mean, cov)
     analytic_nll = float(-analytic_logp.mean())
 
     method = str(cfg.get("density_method", "Heun"))
@@ -96,10 +101,10 @@ def main() -> None:
 
         print(
             f"{steps}\t"
-            f"{pf_nll_value:.4f}\t"
-            f"{analytic_nll:.4f}\t"
-            f"{delta:.4f}\t"
-            f"{kl:.4f}"
+            f"{pf_nll_value:.8f}\t"
+            f"{analytic_nll:.8f}\t"
+            f"{delta:.8f}\t"
+            f"{kl:.8f}"
         )
 
 
