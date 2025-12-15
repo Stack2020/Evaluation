@@ -5,7 +5,7 @@ from config import config, get_device
 from data_loader import generate_test
 from model import build_model
 from sample import load_checkpoint
-from sde import v_to_score
+from sde import forward_perturb, v_to_score
 
 def compute_rot_residual_batch(
     model: torch.nn.Module,
@@ -14,13 +14,19 @@ def compute_rot_residual_batch(
     x_batch: torch.Tensor,
     t_val: float,
 ) -> np.ndarray:
-    """Compute rotational residual at time t using base samples x0."""
+    """Compute rotational residual at time t on noised samples x_t."""
     eps = float(cfg.get("eps", 1e-3))
+    beta_min = float(cfg["beta_min"])
+    beta_max = float(cfg["beta_max"])
+
     x0 = x_batch.to(device=device, dtype=torch.float32)
     t_batch = torch.full((x0.shape[0],), float(t_val), device=device, dtype=x0.dtype)
     t_batch = torch.clamp(t_batch, min=eps, max=1.0)
 
-    x_req = x0.detach().requires_grad_(True)
+    with torch.no_grad():
+        x_t, _, _ = forward_perturb(x0, t_batch, beta_min, beta_max)
+
+    x_req = x_t.detach().requires_grad_(True)
 
     with torch.enable_grad():
         score = v_to_score(model(x_req, t_batch), x_req, t_batch, cfg)
@@ -58,24 +64,23 @@ def main() -> None:
     batch_size = int(merged_cfg.get("score_batch_size", 512))
 
     model.eval()
-    per_time_expectations: list[float] = []
+    per_time_means: list[float] = []
     for t_val in times:
-        rot_sq_list = []
+        rot_list = []
         for start in range(0, test_tensor.shape[0], batch_size):
             end = min(start + batch_size, test_tensor.shape[0])
             xb = test_tensor[start:end]
             rot = compute_rot_residual_batch(model, merged_cfg, device, xb, float(t_val))
-            rot_sq_list.append(rot * rot)
-        rot_sq = np.concatenate(rot_sq_list, axis=0)
-        
-        per_time_expectations.append(float(rot_sq.mean()))
+            rot_list.append(rot)
+        rot_vals = np.concatenate(rot_list, axis=0)
+        per_time_means.append(float(rot_vals.mean()))
 
-    per_time_expectations = np.asarray(per_time_expectations, dtype=np.float64)
-    agg_value = math.sqrt(per_time_expectations.mean())
+    per_time_means = np.asarray(per_time_means, dtype=np.float64)
+    agg_value = float(per_time_means.mean())
 
     print(f"Times: {times.shape[0]} points from 0.01 to 1.00 (step 0.01)")
     print(f"Test samples (spatial probes): {test_np.shape[0]}")
-    print(f"RMS rotational residual (test points across t): {agg_value:.6e}")
+    print(f"Mean rotational residual over test x_t and time: {agg_value:.6e}")
 
 
 if __name__ == "__main__":

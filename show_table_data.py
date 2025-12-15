@@ -10,7 +10,6 @@ from model import build_model
 from sample import load_checkpoint
 from util import integrate_log_probability
 
-
 def gaussian_log_density(points: np.ndarray, mean: np.ndarray, cov: np.ndarray) -> np.ndarray:
     """Analytic log-density of a multivariate Gaussian."""
     cov_inv = np.linalg.inv(cov)
@@ -32,7 +31,7 @@ def evaluate_model_log_density(
     method: str,
     batch_size: int = 512,
 ) -> np.ndarray:
-    """Evaluate model log-density on arbitrary 2D points."""
+    """Evaluate model log-density on arbitrary points (dimension inferred from cfg)."""
     model.eval()
     outputs: list[np.ndarray] = []
     total = points.shape[0]
@@ -61,11 +60,11 @@ def main() -> None:
     cfg.update(ckpt_cfg)
     cfg["config_path"] = str(config["config_path"])
 
-    # Fixed test set (2D) for all evaluations
+    # Fixed test set for all evaluations
     test_np = generate_test(cfg, seed=int(cfg.get("eval_seed_offset", 0))).astype(np.float32)
     batch_size = int(cfg.get("score_batch_size", 512))
     
-    steps_list: Iterable[int] = (100, 200, 250, 500)
+    steps_list: Iterable[int] = (50, 100, 150, 200, 250, 300)
 
     mean = np.asarray(cfg["mu"], dtype=np.float64)
     cov = np.asarray(cfg["sigma"], dtype=np.float64)
@@ -75,7 +74,8 @@ def main() -> None:
     method = str(cfg.get("density_method", "Heun"))
     eps_val = float(cfg.get("nll_eval_eps", cfg.get("eps", 1e-3)))
 
-    print(f"Test samples: {test_np.shape[0]} (2D)")
+    data_dim = test_np.shape[1] if test_np.ndim > 1 else 1
+    print(f"Test samples: {test_np.shape[0]} (dim={data_dim})")
     print("NFE\tPF-ODE NLL\tAnalytic NLL\t|Δ|\tKL(p_data||p_theta)")
 
     for steps in steps_list:

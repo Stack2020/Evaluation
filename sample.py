@@ -14,6 +14,11 @@ def fmt(array) -> str:
     return np.array2string(arr, precision=4, suppress_small=True)
 
 
+def get_data_dim(config: Dict) -> int:
+    mu = config.get("mu", [])
+    return int(config.get("data_dim", len(mu) if len(mu) > 0 else 2))
+
+
 def alpha_bar(t: torch.Tensor, beta_min: float, beta_max: float) -> torch.Tensor:
 
     return torch.exp(-(beta_min * t + 0.5 * (beta_max - beta_min) * t * t))
@@ -35,7 +40,8 @@ def pc_sample(
     corrector_steps = config["corrector_steps"] if corrector_steps is None else corrector_steps
     eps = config["eps"] if eps is None else eps
 
-    x = torch.randn(n_samples, 2, device=device)
+    data_dim = get_data_dim(config)
+    x = torch.randn(n_samples, data_dim, device=device)
     ts = torch.linspace(1.0, eps, steps, device=device)
 
     for i in range(steps - 1):
@@ -78,7 +84,8 @@ def pf_sample(
     steps = config["num_steps"] if steps is None else steps
     eps = config["eps"] if eps is None else eps
 
-    x = torch.randn(n_samples, 2, device=device)
+    data_dim = get_data_dim(config)
+    x = torch.randn(n_samples, data_dim, device=device)
     ts = torch.linspace(1.0, eps, steps, device=device)
 
     for i in range(steps - 1):
@@ -134,7 +141,8 @@ def oracle_sample(
     steps = config["num_steps"] if steps is None else steps
     eps = config["eps"] if eps is None else eps
 
-    x = torch.randn(n_samples, 2, device=device)
+    data_dim = get_data_dim(config)
+    x = torch.randn(n_samples, data_dim, device=device)
     dtype = x.dtype
     mu = torch.as_tensor(config["mu"], device=device, dtype=dtype)
     sigma = torch.as_tensor(config["sigma"], device=device, dtype=dtype)
@@ -184,4 +192,3 @@ def generate_samples(
         else:
             samples = pc_sample(model, config, device, config["n_gen"], **kwargs)
     return samples.cpu().numpy()
-

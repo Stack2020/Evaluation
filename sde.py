@@ -1,4 +1,4 @@
-﻿import math
+import math
 from typing import Dict, Tuple
 import torch
 import torch.nn.functional as F
@@ -8,6 +8,16 @@ def match_shape(coeff: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     while coeff.dim() < target.dim():
         coeff = coeff.unsqueeze(-1)
     return coeff
+
+
+def get_data_dim(config: Dict) -> int:
+    if "data_dim" in config:
+        return int(config["data_dim"])
+    if "mu" in config:
+        return len(config["mu"])
+    if "sigma" in config:
+        return len(config["sigma"])
+    return 2
 
 
 def vp_coefficients(t: torch.Tensor, config: Dict) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -77,7 +87,7 @@ def forward_perturb(
 
 
 def dsm_loss_batch(model, x0: torch.Tensor, config: Dict) -> torch.Tensor:
-    """v-prediction loss for vp."""
+    """v-prediction loss for VP-SDE."""
     beta_min, beta_max = config["beta_min"], config["beta_max"]
     batch = x0.shape[0]
     eps = float(config.get("eps", 1e-3))
@@ -99,6 +109,7 @@ def dsm_loss_batch(model, x0: torch.Tensor, config: Dict) -> torch.Tensor:
             weight = None
 
     lambda_t = integral_beta(t, beta_min, beta_max).unsqueeze(-1)
+    
     alpha_bar = torch.exp(-lambda_t)
     alpha = torch.sqrt(alpha_bar)
 
@@ -120,43 +131,6 @@ def dsm_loss_batch(model, x0: torch.Tensor, config: Dict) -> torch.Tensor:
 def prior_logp_standard_normal(z: torch.Tensor) -> torch.Tensor:
     d = z.shape[1]
     return -0.5 * (z.pow(2).sum(dim=1) + d * math.log(2 * math.pi))
-
-
-def terminal_logp_gaussian(x: torch.Tensor, config: Dict) -> torch.Tensor:
-    """Exact log density of x at t=1 for the VP forward SDE.
-    
-    If x0 ~ N(μ, Σ), then for VP-SDE at t=1:
-    x₁ ~ N(sqrt(α̅(1)) * μ, α̅(1) * Σ + (1 - α̅(1)) * I)
-    """
-    device = x.device
-    dtype = x.dtype
-
-    dim = x.shape[1]
-    eye = torch.eye(dim, device=device, dtype=dtype)
-
-    # Parameters
-    beta_min = config["beta_min"]
-    beta_max = config["beta_max"]
-    mu = torch.tensor(config["mu"], device=device, dtype=dtype)
-    sigma = torch.tensor(config["sigma"], device=device, dtype=dtype)
-
-    # α̅(1) = exp(-∫₀¹ β(s) ds)
-    t_terminal = torch.tensor(1.0, device=device, dtype=dtype)
-    alpha_bar_1 = alpha_bar(t_terminal, beta_min, beta_max)
-
-    # VP noise variance: 1 - α̅(1)
-    noise_var = 1.0 - alpha_bar_1
-
-    # Terminal mean and covariance
-    mean_1 = torch.sqrt(alpha_bar_1) * mu
-    cov_1 = alpha_bar_1 * sigma + noise_var * eye
-
-    # Log probability under N(mean_1, cov_1)
-    cov_inv = torch.inverse(cov_1)
-    diff = x - mean_1
-    exponent = (diff @ cov_inv * diff).sum(dim=1)
-    log_det = torch.logdet(cov_1)
-    return -0.5 * (exponent + log_det + dim * math.log(2.0 * math.pi))
 
 
 #PF-ODE计算
@@ -201,8 +175,9 @@ def probability_flow_sample(
     """
     steps = config["num_steps"] if steps is None else steps
     eps = config["eps"] if eps is None else eps
+    data_dim = get_data_dim(config)
 
-    x = torch.randn(n_samples, 2, device=device)
+    x = torch.randn(n_samples, data_dim, device=device)
     ts = torch.linspace(1.0, eps, steps, device=device)
 
     for i in range(steps - 1):

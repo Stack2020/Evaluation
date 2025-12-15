@@ -12,14 +12,20 @@ class TimeEmbedding(nn.Module):
 
 
 class ScoreNet(nn.Module):
-    def __init__(self, hidden: int = 128, layers: int = 3, t_embed_dim: int = 32):
+    def __init__(
+        self,
+        hidden: int = 128,
+        layers: int = 3,
+        t_embed_dim: int = 32,
+        data_dim: int = 2,
+    ):
         super().__init__()
         self.temb = TimeEmbedding(t_embed_dim)
-        in_dim = 2 + t_embed_dim
+        in_dim = data_dim + t_embed_dim
         modules = [nn.Linear(in_dim, hidden), nn.SiLU()]
         for _ in range(layers - 1):
             modules.extend([nn.Linear(hidden, hidden), nn.SiLU()])
-        modules.append(nn.Linear(hidden, 2))
+        modules.append(nn.Linear(hidden, data_dim))
         self.net = nn.Sequential(*modules)
 
     def forward(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
@@ -29,9 +35,11 @@ class ScoreNet(nn.Module):
 
 
 def build_model(config: dict, device: torch.device) -> ScoreNet:
+    data_dim = int(config.get("data_dim", len(config.get("mu", [])) or 2))
     model = ScoreNet(
         hidden=config["hidden"],
         layers=config["layers"],
         t_embed_dim=config["t_embed_dim"],
+        data_dim=data_dim,
     )
     return model.to(device)

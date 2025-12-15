@@ -4,11 +4,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.ticker import MaxNLocator
 import torch
+import math
+from sde import prior_logp_standard_normal
+
 from sde import (
     dsm_loss_batch,
     drift_pf,
-    divergence_exact,
-    terminal_logp_gaussian
+    divergence_exact
     )
 
 
@@ -20,6 +22,14 @@ def set_seed(seed: int) -> None:
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+def gaussian_log_density(points: np.ndarray, mean: np.ndarray, cov: np.ndarray) -> np.ndarray:
+    cov_inv = np.linalg.inv(cov)
+    diff = points - mean
+    exponent = np.einsum("...i,ij,...j->...", diff, cov_inv, diff)
+    dim = mean.shape[0]
+    log_norm = -0.5 * (dim * math.log(2.0 * math.pi) + np.log(np.linalg.det(cov)))
+    return log_norm - 0.5 * exponent
 
 
 def build_time_grid(
@@ -84,7 +94,7 @@ def integrate_log_probability(
             x = x + 0.5 * dt * (drift_curr_det + drift_next_det)
             accum = accum + 0.5 * dt * (div_curr_det + div_next_det)
 
-        return terminal_logp_gaussian(x, config) + accum
+        return prior_logp_standard_normal(x) + accum
 
     if method_name == "euler":
         x = x0.detach()

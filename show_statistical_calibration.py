@@ -169,7 +169,7 @@ def run_tests(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Energy test + Kernel MMD two-sample checks.")
     
-    parser.add_argument("--method", choices=["pc", "pf"], default="pc", help="Sampling method to generate new data.")
+    parser.add_argument("--method", choices=["pc", "pf"], default="pf", help="Sampling method to generate new data.")
     parser.add_argument("--permutations", type=int, default=200, help="Number of permutations for p-value estimation.")
     parser.add_argument("--seed", type=int, default=None, help="Random seed (defaults to config seed).")
     parser.add_argument("--num-gen", type=int, default=None, help="Number of generated samples (default: config n_gen).")
