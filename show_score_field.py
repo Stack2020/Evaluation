@@ -242,6 +242,20 @@ def compute_time_series(residual: np.ndarray) -> tuple[np.ndarray, np.ndarray, n
     return spatial_mean, mean_abs, max_abs
 
 
+def grid_at_time(grid: np.ndarray, time_idx: int) -> np.ndarray:
+    """
+    Return the 2D grid slice for a specific time index.
+    Supports legacy static grids (ndim=2) and time-varying grids (ndim=3).
+    """
+    if grid.ndim == 2:
+        return grid
+    if grid.ndim == 3:
+        if time_idx < 0 or time_idx >= grid.shape[0]:
+            raise IndexError(f"time index {time_idx} outside grid range 0..{grid.shape[0]-1}")
+        return grid[time_idx]
+    raise ValueError(f"Unsupported grid dimension {grid.ndim}; expected 2 or 3.")
+
+
 def calculate_spatial_time_score(rot_residual: np.ndarray) -> float:
     """
     Compute the space-time aggregated rotational residual (Eq. 29):
@@ -467,16 +481,18 @@ def make_panel_plot(
             continue
         panel_idx = panel_indices[idx]
         slice_data = residual[panel_idx]
+        gx = grid_at_time(grid_x, panel_idx)
+        gy = grid_at_time(grid_y, panel_idx)
         mesh = ax.pcolormesh(
-            grid_x,
-            grid_y,
+            gx,
+            gy,
             slice_data,
             shading="auto",
             cmap=cmap,
             norm=norm,
         )
         last_mesh = mesh
-        add_contours(ax, grid_x, grid_y, slice_data, contour_quantiles, contour_alpha)
+        add_contours(ax, gx, gy, slice_data, contour_quantiles, contour_alpha)
         ax.set_title(rf"$t={panel_times[idx]:.2f}$", fontsize=11)
         ax.set_xlabel("x1")
         ax.set_ylabel("x2")
@@ -526,20 +542,22 @@ def make_highlight_plot(
     import matplotlib.pyplot as plt
 
     plt.style.use("seaborn-v0_8")
+    grid_x_t = grid_at_time(grid_x, highlight_idx)
+    grid_y_t = grid_at_time(grid_y, highlight_idx)
     fig = plt.figure(figsize=(11.0, 5.6), constrained_layout=True)
     gs = fig.add_gridspec(1, 2, width_ratios=[2.7, 1.1], wspace=0.15)
     ax_main = fig.add_subplot(gs[0])
     mesh = ax_main.pcolormesh(
-        grid_x,
-        grid_y,
+        grid_x_t,
+        grid_y_t,
         residual_slice,
         shading="auto",
         cmap=cmap,
         norm=norm,
     )
-    add_contours(ax_main, grid_x, grid_y, residual_slice, contour_quantiles, contour_alpha)
+    add_contours(ax_main, grid_x_t, grid_y_t, residual_slice, contour_quantiles, contour_alpha)
 
-    quiver_payload = downsample_for_quiver(grid_x, grid_y, score_slice, quiver_density)
+    quiver_payload = downsample_for_quiver(grid_x_t, grid_y_t, score_slice, quiver_density)
     if quiver_payload is not None:
         xs, ys, u, v = quiver_payload
         ax_main.quiver(
@@ -617,6 +635,15 @@ def main() -> None:
     rot_residual = data["rot_residual"]
     score_field = data.get("score")
 
+    if grid_x.ndim not in (2, 3) or grid_y.ndim not in (2, 3):
+        raise ValueError(f"Unexpected grid dimensions: grid_x {grid_x.shape}, grid_y {grid_y.shape}")
+    if grid_x.ndim != grid_y.ndim:
+        raise ValueError(f"Mismatched grid dimensions: grid_x {grid_x.shape}, grid_y {grid_y.shape}")
+    if grid_x.ndim == 3 and grid_x.shape[0] != times.shape[0]:
+        raise ValueError(f"grid_x time dimension {grid_x.shape[0]} does not match times {times.shape[0]}")
+    if grid_y.ndim == 3 and grid_y.shape[0] != times.shape[0]:
+        raise ValueError(f"grid_y time dimension {grid_y.shape[0]} does not match times {times.shape[0]}")
+
     panel_times = (
         list(args.panel_times)
         if args.panel_times is not None
@@ -687,17 +714,6 @@ def main() -> None:
     )
     summary_times = ", ".join(f"{t:.3f}" for t in actual_panel_times)
     print(f"Saved rotational residual panels at [{summary_times}] to {args.figure}")
-
-    plot_time_series(
-        times=times,
-        spatial_mean=spatial_mean,
-        highlight_idx=highlight_idx,
-        highlight_time=highlight_time,
-        highlight_width=args.highlight_width,
-        output_path=args.stats_figure,
-        dpi=args.dpi,
-    )
-    print(f"Saved spatial-mean time series to {args.stats_figure}")
 
     agg_score = calculate_spatial_time_score(rot_residual)
     print(f"Space-time RMS rotational residual (Eq. 29): {agg_score:.6e}")
