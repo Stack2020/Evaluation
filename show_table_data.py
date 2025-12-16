@@ -96,10 +96,10 @@ def main() -> None:
 
         print(
             f"{steps}\t"
-            f"{pf_nll_value:.4f}\t"
-            f"{analytic_nll:.4f}\t"
-            f"{delta:.4f}\t"
-            f"{kl:.4f}"
+            f"{pf_nll_value:.8f}\t"
+            f"{analytic_nll:.8f}\t"
+            f"{delta:.8f}\t"
+            f"{kl:.8f}"
         )
 
 
