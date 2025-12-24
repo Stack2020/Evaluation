@@ -1,10 +1,8 @@
-import torch
 from config import  config, get_device
-from data_loader import build_train_loader, build_val_loader, generate_train_val
+from miniboone_data_loader import prepare_miniboone_loaders
 from model import build_model
 from train import train_model
 from util import set_seed
-
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -16,19 +14,32 @@ def main() -> None:
     if device.type == "cuda":
         print("Using device:", device)
 
-    train_np, val_np = generate_train_val(config, seed=seed)
-    print("Train/Val shapes:", train_np.shape, val_np.shape)
+    train_loader, val_loader, _test_loader, stats = prepare_miniboone_loaders(
+        path=config.get("miniboone_path", "./data/miniboone.npy"),
+        batch_size=config["batch_size"],
+        seed=seed,
+    )
 
-    train_tensor = torch.from_numpy(train_np)
-    val_tensor = torch.from_numpy(val_np)
+    data_dim = stats["train_raw"].shape[1]
+    if int(config.get("data_dim", data_dim)) != data_dim:
+        print(f"Updating data_dim from {config.get('data_dim')} to {data_dim}")
+    config["data_dim"] = data_dim
+
+    print(
+        "Splits (train/val/test):",
+        stats["train_raw"].shape,
+        stats["val_raw"].shape,
+        stats["test_raw"].shape,
+    )
 
     model = build_model(config, device)
    
     print(f"Params: {sum(p.numel() for p in model.parameters()):.1f}")
 
-    train_loader = build_train_loader(train_tensor, config["batch_size"])
+    checkpoint_path = config.get("config_path", "vp_sde_miniboone_best.pt")
+    config["config_path"] = checkpoint_path
     
-    val_loader = build_val_loader(val_tensor, config["batch_size"])
+    print(f"Checkpoint path: {checkpoint_path}")
 
     train_model(
         model,
@@ -36,7 +47,7 @@ def main() -> None:
         device,
         train_loader,
         val_loader,
-        config["config_path"])
+        checkpoint_path)
 
 if __name__ == "__main__":
     main()

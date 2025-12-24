@@ -126,6 +126,7 @@ def train_model(
                 else:
                     t = eps + (1.0 - eps) * torch.pow(u, gamma)
                 xt, _, _ = forward_perturb(xb, t, config["beta_min"], config["beta_max"])
+                
                 xt = xt.detach().requires_grad_(True)
                 with torch.enable_grad():
                     score = v_to_score(model(xt, t), xt, t, config)
