@@ -2,7 +2,7 @@ from typing import Dict
 import torch
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
-from sde import dsm_loss_batch, forward_perturb, v_to_score, drift_pf
+from sde import dsm_loss_batch, forward_perturb, v_to_score
 from util import evaluation_loss
 
 def build_scheduler_after_reset(optimizer, config, remaining_epochs: int):
@@ -63,7 +63,7 @@ def train_model(
     checkpoint_path: str,
 ) -> None:
     lambda_curl = float(config.get("lambda_curl", 0.0))
-    lambda_cont = float(config.get("lambda_cont", 0.0))
+    print(lambda_curl)
     # ----- Optimizer -----
     optimizer = AdamW(
         model.parameters(),
@@ -118,7 +118,7 @@ def train_model(
 
             loss = dsm_loss_batch(model, xb, config)
             
-            if lambda_curl > 0.0 or lambda_cont > 0.0:
+            if lambda_curl > 0.0:
                 eps = float(config.get("eps", 1e-3))
                 gamma = float(config.get("loss_time_gamma", 1.0))
                 u = torch.rand(xb.shape[0], device=xb.device, dtype=xb.dtype)
@@ -130,37 +130,19 @@ def train_model(
                 xt = xt.detach().requires_grad_(True)
                 with torch.enable_grad():
                     score = v_to_score(model(xt, t), xt, t, config)
-                    if lambda_curl > 0.0:
-                        jac_rows = []
-                        for comp in range(score.shape[1]):
-                            grad = torch.autograd.grad(
-                                outputs=score[:, comp].sum(),
-                                inputs=xt,
-                                retain_graph=True,
-                                create_graph=True,
-                                allow_unused=False,
-                            )[0]
-                            jac_rows.append(grad.unsqueeze(1))
-                        jac = torch.cat(jac_rows, dim=1)
-                        curl_pen = ((jac - jac.transpose(1, 2)) ** 2).sum(dim=(1, 2)).mean()
-                        loss = loss + lambda_curl * curl_pen
-                    
-                    if lambda_cont > 0.0:
-                        velocity = drift_pf(model, xt, t, config)
-                        div_terms = []
-                        for j in range(velocity.shape[1]):
-                            grad_j = torch.autograd.grad(
-                                outputs=velocity[:, j].sum(),
-                                inputs=xt,
-                                retain_graph=True,
-                                create_graph=True,
-                                allow_unused=False,
-                            )[0]
-                            div_terms.append(grad_j[:, j])
-                        divergence = torch.stack(div_terms, dim=1).sum(dim=1)
-                        conv = (velocity * score).sum(dim=1)
-                        cont_pen = (divergence + conv).pow(2).mean()
-                        loss = loss + lambda_cont * cont_pen
+                    jac_rows = []
+                    for comp in range(score.shape[1]):
+                        grad = torch.autograd.grad(
+                            outputs=score[:, comp].sum(),
+                            inputs=xt,
+                            retain_graph=True,
+                            create_graph=True,
+                            allow_unused=False,
+                        )[0]
+                        jac_rows.append(grad.unsqueeze(1))
+                    jac = torch.cat(jac_rows, dim=1)
+                    curl_pen = ((jac - jac.transpose(1, 2)) ** 2).sum(dim=(1, 2)).mean()
+                    loss = loss + lambda_curl * curl_pen
 
             optimizer.zero_grad(set_to_none=True)
             
