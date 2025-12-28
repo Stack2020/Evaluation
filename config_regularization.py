@@ -14,7 +14,7 @@ config = {
     #"sigma": [[1.0, 0.0], [0.0, 1]],
     "beta_min": 0.1,
     "beta_max": 20.0,
-    "eps": 1e-3,
+    "eps": 1e-4,
     "density_eval_points": 2000,
     "density_eval_steps": 600,
     "nll_time_schedule": "power",
@@ -31,15 +31,19 @@ config = {
     "weight_decay": 1e-4,
     "clip_grad_norm": 5.0,
     "lambda_gamma": 1.0,  # 降低权重的影响，更平衡地训练所有时间步
-    #正则项惩罚
-    "lambda_curl":1e-3,
-           
+    #正则项惩罚动态调整
+    "curl":True,
+    "lambda_curl_max":0.1,
+    "lambda_curl_min":1e-5,
+    "lambda_curl_k":70.0,
+
+
     "num_steps": 5000,
     "snr": 0.08,
     "corrector_steps": 2,
     "scatter_alpha": 0.5,
     "scatter_size": 10,
-    "config_path":"vp_sde_2d_regularization_high.pt"
+    "config_path":"vp_sde_2d_regularization.pt"
 }
          
 

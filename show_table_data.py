@@ -4,7 +4,7 @@ from typing import Iterable
 import numpy as np
 import torch
 
-from config import config, get_device
+from config_regularization import config, get_device
 from data_loader import generate_test
 from model import build_model
 from sample import load_checkpoint
@@ -96,10 +96,10 @@ def main() -> None:
 
         print(
             f"{steps}\t"
-            f"{pf_nll_value:.4f}\t"
-            f"{analytic_nll:.4f}\t"
-            f"{delta:.4f}\t"
-            f"{kl:.4f}"
+            f"{pf_nll_value:.6f}\t"
+            f"{analytic_nll:.6f}\t"
+            f"{delta:.6f}\t"
+            f"{kl:.6f}"
         )
 
 

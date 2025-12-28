@@ -9,7 +9,8 @@ import math
 import numpy as np
 
 from calculate_score_field import calculate_score_field
-from config import config as base_config
+
+from config_regularization import config as base_config
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Compute score field and visualize rotational residuals.")

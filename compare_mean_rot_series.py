@@ -16,14 +16,10 @@ def load_series(path: Path) -> tuple[np.ndarray, np.ndarray]:
 
 def main() -> None:
     label_lambda0 = r"$\lambda=0$"
-    label_lambda1e5 = r"$\lambda=1e-5$"
-    label_lambda1e4 = r"$\lambda=1e-4$"
-    label_lambda1e3 = r"$\lambda=1e-3$"
+    label_lambda_t = r"$\lambda=\lambda(t)$"
     files = [
         (label_lambda0, Path("vp_sde_2d_best_mean_rot_series.npz")),
-        (label_lambda1e5, Path("vp_sde_2d_regularization_low_mean_rot_series.npz")),
-        (label_lambda1e4, Path("vp_sde_2d_regularization_mean_rot_series.npz")),
-        (label_lambda1e3, Path("vp_sde_2d_regularization_high_mean_rot_series.npz")),
+        (label_lambda_t, Path("vp_sde_2d_regularization_mean_rot_series.npz")),
     ]
 
     series: list[tuple[str, np.ndarray, np.ndarray]] = []
@@ -43,9 +39,7 @@ def main() -> None:
 
     colors = {
         label_lambda0: "#0a3a5c",
-        label_lambda1e5: "r",
-        label_lambda1e4: "m",
-        label_lambda1e3: "g",
+        label_lambda_t: "#d1495b",
     }
 
     for label, times, mean_rot in series:

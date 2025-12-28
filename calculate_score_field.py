@@ -2,13 +2,16 @@ from __future__ import annotations
 import math
 from pathlib import Path
 from typing import Iterable, Sequence
+import os
+
+# Avoid Intel OpenMP duplicate runtime aborts on Windows.
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 
 import numpy as np
 import torch
 
 from config import config as base_config, get_device
 from model import build_model
-from sample import load_checkpoint
 from sde import v_to_score
 
 __all__ = [
@@ -181,9 +184,10 @@ def calculate_score_field(
     time_varying_grid: bool = True,
 ) -> dict[str, np.ndarray]:
     device = get_device()
-    model = build_model(base_config, device)
-    checkpoint = load_checkpoint(model, str(checkpoint_path), device)
+    checkpoint = torch.load(checkpoint_path, map_location=device)
     merged_config = merge_config(checkpoint, checkpoint_path)
+    model = build_model(merged_config, device)
+    model.load_state_dict(checkpoint["model"])
     eps = float(merged_config.get("eps", 1e-3))
     validated_times = validate_times(times, eps)
 
