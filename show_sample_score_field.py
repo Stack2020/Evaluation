@@ -1,8 +1,9 @@
 import math
+from pathlib import Path
 import numpy as np
 import torch
 from config import config, get_device
-from data_loader import generate_test
+from gmm_data_loader import generate_test
 from model import build_model
 from sample import load_checkpoint
 from sde import forward_perturb, v_to_score
@@ -78,9 +79,25 @@ def main() -> None:
     per_time_means = np.asarray(per_time_means, dtype=np.float64)
     agg_value = float(per_time_means.mean())
 
+    print("Mean R_rot per time (t, mean):")
+    for t_val, mean_val in zip(times, per_time_means):
+        print(f"  t={float(t_val):.2f}  mean={mean_val:.6e}")
+    print(f"Aggregate mean over all times: {agg_value:.6e}")
+
+    ckpt_path = Path(merged_cfg["config_path"])
+    prefix = ckpt_path.stem
+    output_npz = ckpt_path.with_name(f"{prefix}_mean_rot_series.npz")
+    np.savez(
+        output_npz,
+        times=times,
+        mean_rot=per_time_means,
+        agg_mean=agg_value,
+    )
+
     print(f"Times: {times.shape[0]} points from 0.01 to 1.00 (step 0.01)")
     print(f"Test samples (spatial probes): {test_np.shape[0]}")
     print(f"Mean rotational residual over test x_t and time: {agg_value:.6e}")
+    print(f"Saved mean R_rot time series to {output_npz}")
 
 
 if __name__ == "__main__":
