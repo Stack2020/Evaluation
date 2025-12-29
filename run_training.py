@@ -1,5 +1,5 @@
 import torch
-from config import  config, get_device
+from regularization import  config, get_device
 from data_loader import build_train_loader, build_val_loader, generate_train_val
 from model import build_model
 from train import train_model

@@ -23,11 +23,11 @@ config = {
     "loss_time_gamma": 2.2,
     "loss_time_reweight": False,
     "loss_time_weight_max": 0.0,
-    "hidden": 256,
-    "layers": 4,
+    "hidden": 64,
+    "layers": 3,
     "t_embed_dim": 64,
     "batch_size": 128,
-    "epochs": 3500,
+    "epochs": 3000,
     "lr": 1e-3,
     "weight_decay": 1e-4,
     "clip_grad_norm": 5.0,
@@ -43,7 +43,7 @@ config = {
     "corrector_steps": 2,
     "scatter_alpha": 0.5,
     "scatter_size": 10,
-    "config_path": "vp_sde_wrap_regularization.pt",
+    "config_path": "vp_sde_wrap_best.pt",
 }
 
 
