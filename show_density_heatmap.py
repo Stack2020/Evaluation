@@ -162,7 +162,7 @@ def main() -> None:
     abs_error = np.abs(model_density - analytic_density)
 
     plt.style.use("seaborn-v0_8")
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5.2))
+    fig, axes = plt.subplots(1, 3, figsize=(12, 4.8))
 
     density_cmap = plt.get_cmap("viridis")
     error_cmap = plt.get_cmap("magma")
@@ -171,24 +171,25 @@ def main() -> None:
     axes[0].set_title("Density(Involute)")
     axes[0].set_xlabel("x")
     axes[0].set_ylabel("y")
-    fig.colorbar(im0, ax=axes[0], shrink=0.8)
+    fig.colorbar(im0, ax=axes[0], shrink=1.0, fraction=0.03, pad=0.01)
 
     im1 = axes[1].pcolormesh(grid_x, grid_y, model_density, shading="auto", cmap=density_cmap)
     axes[1].set_title("PF-ODE Density")
     axes[1].set_xlabel("x")
     axes[1].set_ylabel("y")
-    fig.colorbar(im1, ax=axes[1], shrink=0.8)
+    fig.colorbar(im1, ax=axes[1], shrink=1.0, fraction=0.03, pad=0.01)
 
     im2 = axes[2].pcolormesh(grid_x, grid_y, abs_error, shading="auto", cmap=error_cmap)
     axes[2].set_title("Absolute Error")
     axes[2].set_xlabel("x")
     axes[2].set_ylabel("y")
-    fig.colorbar(im2, ax=axes[2], shrink=0.8)
+    fig.colorbar(im2, ax=axes[2], shrink=1.0, fraction=0.03, pad=0.01)
 
     for ax in axes:
         ax.set_aspect("equal")
+        
 
-    fig.subplots_adjust(left=0.10, right=0.90, bottom=0.10, top=0.90)
+    fig.subplots_adjust(left=0.10, right=0.90, bottom=0.05, top=0.90)
 
     fig.savefig(output_path, dpi=300)
     print(f"Saved heatmaps to {output_path}")
