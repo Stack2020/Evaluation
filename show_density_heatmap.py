@@ -193,23 +193,27 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     suffix = output_path.suffix if output_path.suffix else ".png"
     target_path = output_path if output_path.suffix else output_path.with_suffix(suffix)
-    figure_size = (10.0, 3.6)
+    figure_size = (14.0, 3.6)
 
     density_cmap = plt.get_cmap("viridis")
     error_cmap = plt.get_cmap("magma")
 
     fig = plt.figure(figsize=figure_size)
-    gs = fig.add_gridspec(1, 6, width_ratios=[1.0, 0.05, 1.0, 0.05, 1.0, 0.05])
+    gs = fig.add_gridspec(1, 3, width_ratios=[1.0, 1.0, 1.0])
     ax_analytic = fig.add_subplot(gs[0, 0])
-    cax_analytic = fig.add_subplot(gs[0, 1])
-    ax_model = fig.add_subplot(gs[0, 2])
-    cax_model = fig.add_subplot(gs[0, 3])
-    ax_error = fig.add_subplot(gs[0, 4])
-    cax_error = fig.add_subplot(gs[0, 5])
+    ax_model = fig.add_subplot(gs[0, 1])
+    ax_error = fig.add_subplot(gs[0, 2])
 
-    fig.subplots_adjust(left=0.06, right=0.98, top=0.90, bottom=0.12, wspace=0.28)
+    fig.subplots_adjust(left=0.10, right=0.98, top=0.90, bottom=0.12, wspace=0.32)
 
-    def draw_panel(ax, cax, data, title, cmap, cbar_label, vmin=None, vmax=None):
+    def make_cax(ref_ax, pad: float = 0.006, width: float = 0.02, height_frac: float = 0.82):
+        pos = ref_ax.get_position()
+        new_height = pos.height * height_frac
+        y0 = pos.y0 + (pos.height - new_height) * 0.5
+        x0 = pos.x0 - pad - width
+        return fig.add_axes([x0, y0, width, new_height])
+
+    def draw_panel(ax, data, title, cmap, cbar_label, vmin=None, vmax=None):
         im = ax.pcolormesh(grid_x, grid_y, data, shading="auto", cmap=cmap, vmin=vmin, vmax=vmax)
         ax.set_title(title)
         ax.set_xlabel("x")
@@ -219,12 +223,13 @@ def main() -> None:
             x_min, x_max, y_min, y_max = plot_bounds
             ax.set_xlim(x_min, x_max)
             ax.set_ylim(y_min, y_max)
+        cax = make_cax(ax, pad=0.008, width=0.018, height_frac=0.82)
         cbar = fig.colorbar(im, cax=cax)
-        cbar.set_label(cbar_label)
+        cbar.set_label(cbar_label, fontsize=12)
+        cbar.ax.tick_params(labelsize=11, width=0.8, length=3, pad=2, direction="out")
 
     draw_panel(
         ax_analytic,
-        cax_analytic,
         analytic_density,
         "GMM Density",
         density_cmap,
@@ -234,7 +239,6 @@ def main() -> None:
     )
     draw_panel(
         ax_model,
-        cax_model,
         model_density,
         "PF-ODE Density",
         density_cmap,
@@ -244,7 +248,6 @@ def main() -> None:
     )
     draw_panel(
         ax_error,
-        cax_error,
         abs_error,
         "Absolute Error",
         error_cmap,
