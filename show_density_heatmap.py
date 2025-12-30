@@ -177,37 +177,73 @@ def main() -> None:
     model_density = np.exp(model_log_density)
     abs_error = np.abs(model_density - analytic_density)
 
+    density_vmin = float(min(analytic_density.min(), model_density.min()))
+    density_vmax = float(max(analytic_density.max(), model_density.max()))
+
     plt.style.use("seaborn-v0_8")
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5.2))
+    output_dir = output_path.parent if output_path.parent != Path("") else Path(".")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    suffix = output_path.suffix if output_path.suffix else ".png"
+    base_name = output_path.stem or "density_heatmap"
+    figure_size = (5.0, 4.2)
 
     density_cmap = plt.get_cmap("viridis")
     error_cmap = plt.get_cmap("magma")
 
-    im0 = axes[0].pcolormesh(grid_x, grid_y, analytic_density, shading="auto", cmap=density_cmap)
-    axes[0].set_title("GMM Density")
-    axes[0].set_xlabel("x")
-    axes[0].set_ylabel("y")
-    fig.colorbar(im0, ax=axes[0], shrink=0.8)
-
-    im1 = axes[1].pcolormesh(grid_x, grid_y, model_density, shading="auto", cmap=density_cmap)
-    axes[1].set_title("PF-ODE Density")
-    axes[1].set_xlabel("x")
-    axes[1].set_ylabel("y")
-    fig.colorbar(im1, ax=axes[1], shrink=0.8)
-
-    im2 = axes[2].pcolormesh(grid_x, grid_y, abs_error, shading="auto", cmap=error_cmap)
-    axes[2].set_title("Absolute Error")
-    axes[2].set_xlabel("x")
-    axes[2].set_ylabel("y")
-    fig.colorbar(im2, ax=axes[2], shrink=0.8)
-
-    for ax in axes:
+    def save_single_plot(
+        data: np.ndarray,
+        title: str,
+        cmap,
+        target_path: Path,
+        colorbar_label: str,
+        vmin: float | None = None,
+        vmax: float | None = None,
+    ) -> None:
+        fig, ax = plt.subplots(figsize=figure_size)
+        im = ax.pcolormesh(grid_x, grid_y, data, shading="auto", cmap=cmap, vmin=vmin, vmax=vmax)
+        ax.set_title(title)
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
         ax.set_aspect("equal")
+        cbar = fig.colorbar(im, ax=ax, shrink=0.82)
+        cbar.set_label(colorbar_label)
+        fig.tight_layout()
+        fig.savefig(target_path, dpi=300)
+        plt.close(fig)
 
-    fig.subplots_adjust(left=0.10, right=0.90, bottom=0.10, top=0.90)
+    analytic_path = output_dir / f"{base_name}_gmm_density{suffix}"
+    model_path = output_dir / f"{base_name}_pf_ode_density{suffix}"
+    error_path = output_dir / f"{base_name}_abs_error{suffix}"
 
-    fig.savefig(output_path, dpi=300)
-    print(f"Saved heatmaps to {output_path}")
+    save_single_plot(
+        analytic_density,
+        "GMM Density",
+        density_cmap,
+        analytic_path,
+        "Probability density",
+        vmin=density_vmin,
+        vmax=density_vmax,
+    )
+    save_single_plot(
+        model_density,
+        "PF-ODE Density",
+        density_cmap,
+        model_path,
+        "Probability density",
+        vmin=density_vmin,
+        vmax=density_vmax,
+    )
+    save_single_plot(
+        abs_error,
+        "Absolute Error",
+        error_cmap,
+        error_path,
+        "Absolute error",
+    )
+
+    print(f"Saved GMM density heatmap to {analytic_path}")
+    print(f"Saved PF-ODE density heatmap to {model_path}")
+    print(f"Saved absolute error heatmap to {error_path}")
 
 
 if __name__ == "__main__":
