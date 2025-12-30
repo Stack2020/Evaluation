@@ -19,6 +19,7 @@ DEFAULT_SETTINGS = {
     "method": "Heun",
     "steps_override": None,
     "eps_override": None,
+    "plot_bounds": (-6.0, 6.0, -6.0, 6.0),
 }
 
 def gaussian_log_density(points: np.ndarray, mean: np.ndarray, cov: np.ndarray) -> np.ndarray:
@@ -97,9 +98,14 @@ def build_grid(
     resolution: int,
     span_sigma: float,
     mixture: dict[str, np.ndarray] | None = None,
+    fixed_bounds: tuple[float, float, float, float] | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Construct a uniform 2D grid covering either a single Gaussian or a mixture."""
-    if mixture is not None:
+    if fixed_bounds is not None:
+        x_min, x_max, y_min, y_max = fixed_bounds
+        x_vals = np.linspace(x_min, x_max, resolution)
+        y_vals = np.linspace(y_min, y_max, resolution)
+    elif mixture is not None:
         means = np.asarray(mixture["means"], dtype=np.float64)
         covariances = np.asarray(mixture["covariances"], dtype=np.float64)
         diag_vars = np.diagonal(covariances, axis1=1, axis2=2)
@@ -131,6 +137,7 @@ def main() -> None:
     method_pref: str | None = settings["method"]
     steps_override: int | None = settings["steps_override"]
     eps_override: float | None = settings["eps_override"]
+    plot_bounds: tuple[float, float, float, float] | None = settings["plot_bounds"]
 
     device = get_device()
     model = build_model(config, device)
@@ -147,6 +154,7 @@ def main() -> None:
         resolution=resolution,
         span_sigma=span_sigma,
         mixture=reference_mixture,
+        fixed_bounds=plot_bounds,
     )
 
     if reference_mixture is not None:
@@ -184,66 +192,69 @@ def main() -> None:
     output_dir = output_path.parent if output_path.parent != Path("") else Path(".")
     output_dir.mkdir(parents=True, exist_ok=True)
     suffix = output_path.suffix if output_path.suffix else ".png"
-    base_name = output_path.stem or "density_heatmap"
-    figure_size = (5.0, 4.2)
+    target_path = output_path if output_path.suffix else output_path.with_suffix(suffix)
+    figure_size = (10.0, 3.6)
 
     density_cmap = plt.get_cmap("viridis")
     error_cmap = plt.get_cmap("magma")
 
-    def save_single_plot(
-        data: np.ndarray,
-        title: str,
-        cmap,
-        target_path: Path,
-        colorbar_label: str,
-        vmin: float | None = None,
-        vmax: float | None = None,
-    ) -> None:
-        fig, ax = plt.subplots(figsize=figure_size)
+    fig = plt.figure(figsize=figure_size)
+    gs = fig.add_gridspec(1, 6, width_ratios=[1.0, 0.05, 1.0, 0.05, 1.0, 0.05])
+    ax_analytic = fig.add_subplot(gs[0, 0])
+    cax_analytic = fig.add_subplot(gs[0, 1])
+    ax_model = fig.add_subplot(gs[0, 2])
+    cax_model = fig.add_subplot(gs[0, 3])
+    ax_error = fig.add_subplot(gs[0, 4])
+    cax_error = fig.add_subplot(gs[0, 5])
+
+    fig.subplots_adjust(left=0.06, right=0.98, top=0.90, bottom=0.12, wspace=0.28)
+
+    def draw_panel(ax, cax, data, title, cmap, cbar_label, vmin=None, vmax=None):
         im = ax.pcolormesh(grid_x, grid_y, data, shading="auto", cmap=cmap, vmin=vmin, vmax=vmax)
         ax.set_title(title)
         ax.set_xlabel("x")
         ax.set_ylabel("y")
         ax.set_aspect("equal")
-        cbar = fig.colorbar(im, ax=ax, shrink=0.82)
-        cbar.set_label(colorbar_label)
-        fig.tight_layout()
-        fig.savefig(target_path, dpi=300)
-        plt.close(fig)
+        if plot_bounds is not None:
+            x_min, x_max, y_min, y_max = plot_bounds
+            ax.set_xlim(x_min, x_max)
+            ax.set_ylim(y_min, y_max)
+        cbar = fig.colorbar(im, cax=cax)
+        cbar.set_label(cbar_label)
 
-    analytic_path = output_dir / f"{base_name}_gmm_density{suffix}"
-    model_path = output_dir / f"{base_name}_pf_ode_density{suffix}"
-    error_path = output_dir / f"{base_name}_abs_error{suffix}"
-
-    save_single_plot(
+    draw_panel(
+        ax_analytic,
+        cax_analytic,
         analytic_density,
         "GMM Density",
         density_cmap,
-        analytic_path,
         "Probability density",
         vmin=density_vmin,
         vmax=density_vmax,
     )
-    save_single_plot(
+    draw_panel(
+        ax_model,
+        cax_model,
         model_density,
         "PF-ODE Density",
         density_cmap,
-        model_path,
         "Probability density",
         vmin=density_vmin,
         vmax=density_vmax,
     )
-    save_single_plot(
+    draw_panel(
+        ax_error,
+        cax_error,
         abs_error,
         "Absolute Error",
         error_cmap,
-        error_path,
         "Absolute error",
     )
 
-    print(f"Saved GMM density heatmap to {analytic_path}")
-    print(f"Saved PF-ODE density heatmap to {model_path}")
-    print(f"Saved absolute error heatmap to {error_path}")
+    fig.savefig(target_path, dpi=300)
+    plt.close(fig)
+
+    print(f"Saved density heatmaps panel to {target_path}")
 
 
 if __name__ == "__main__":
