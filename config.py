@@ -34,16 +34,13 @@ config = {
     "lambda_gamma": 1.0,
      #正则项惩罚动态调整
     "curl":True,
-    "lambda_curl_max":0.1,
-    "lambda_curl_min":1e-5,
-    "lambda_curl_k":70.0,
-
+    
     "num_steps": 5000,
     "snr": 0.08,
     "corrector_steps": 2,
     "scatter_alpha": 0.5,
     "scatter_size": 10,
-    "config_path": "vp_sde_wrap_best.pt",
+    "config_path": "vp_sde_wrap_regularization.pt",
 }
 
 
