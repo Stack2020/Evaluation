@@ -63,19 +63,16 @@ def train_model(
     checkpoint_path: str,
 ) -> None:
     curl_flag = config.get("curl", False)
-    lambda_curl_max = float(config.get("lambda_curl_max", 0.1))
-    lambda_curl_min = float(config.get("lambda_curl_min", 1e-3))
-    lambda_curl_k = float(config.get("lambda_curl_k", 30.0))
 
     def lambda_curl(t: torch.Tensor) -> torch.Tensor:
         """Time-dependent curl regularization weight."""
-        return (lambda_curl_max - lambda_curl_min) * torch.exp(-lambda_curl_k * t) + lambda_curl_min
+        lambda_max=0.1
+        t_cutoff = 0.1     
+        k = 120
+        return lambda_max* torch.sigmoid(-k * (t-t_cutoff))
 
     if curl_flag:
-        print(
-            f"Using curl regularization schedule: lambda_max={lambda_curl_max}, "
-            f"lambda_min={lambda_curl_min}, k={lambda_curl_k}"
-        )
+        print(f"Using curl regularization schedule")
     # ----- Optimizer -----
     optimizer = AdamW(
         model.parameters(),

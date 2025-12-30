@@ -16,7 +16,7 @@ config = {
     "loss_time_gamma": 2.2,
     "loss_time_reweight": False,
     "loss_time_weight_max": 0.0,
-    "hidden": 128,  # 从128增加到256
+    "hidden": 256,  # 从128增加到256
     "layers": 4,   # 从8增加到10
     "t_embed_dim": 64,
     "batch_size": 128,
@@ -27,9 +27,6 @@ config = {
     "lambda_gamma": 1.0,  # 降低权重的影响，更平衡地训练所有时间步
     #正则项惩罚动态调整
     "curl":True,
-    "lambda_curl_max":0.1,
-    "lambda_curl_min":1e-5,
-    "lambda_curl_k":70.0,
 
     "num_steps": 5000,
     "snr": 0.08,

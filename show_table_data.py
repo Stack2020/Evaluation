@@ -5,7 +5,6 @@ import numpy as np
 import torch
 
 from config import config, get_device
-from data_loader import generate_test
 from gmm_data_loader import GMM_DATA, generate_test as generate_gmm_test
 from model import build_model
 from sample import load_checkpoint
