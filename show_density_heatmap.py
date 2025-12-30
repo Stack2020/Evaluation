@@ -178,13 +178,13 @@ def main() -> None:
     abs_error = np.abs(model_density - analytic_density)
 
     plt.style.use("seaborn-v0_8")
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4.8), constrained_layout=True)
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5.2))
 
     density_cmap = plt.get_cmap("viridis")
     error_cmap = plt.get_cmap("magma")
 
     im0 = axes[0].pcolormesh(grid_x, grid_y, analytic_density, shading="auto", cmap=density_cmap)
-    axes[0].set_title("Ground Truth Density")
+    axes[0].set_title("GMM Density")
     axes[0].set_xlabel("x")
     axes[0].set_ylabel("y")
     fig.colorbar(im0, ax=axes[0], shrink=0.8)
@@ -203,6 +203,8 @@ def main() -> None:
 
     for ax in axes:
         ax.set_aspect("equal")
+
+    fig.subplots_adjust(left=0.10, right=0.90, bottom=0.10, top=0.90)
 
     fig.savefig(output_path, dpi=300)
     print(f"Saved heatmaps to {output_path}")

@@ -16,8 +16,8 @@ config = {
     "loss_time_gamma": 2.2,
     "loss_time_reweight": False,
     "loss_time_weight_max": 0.0,
-    "hidden": 256,  # 从128增加到256
-    "layers": 4,   # 从8增加到10
+    "hidden": 64,  # 从128增加到256
+    "layers": 3,   # 从8增加到10
     "t_embed_dim": 64,
     "batch_size": 128,
     "epochs": 3500,  # 训练更久
@@ -27,13 +27,12 @@ config = {
     "lambda_gamma": 1.0,  # 降低权重的影响，更平衡地训练所有时间步
     #正则项惩罚动态调整
     "curl":True,
-
     "num_steps": 5000,
     "snr": 0.08,
     "corrector_steps": 2,
     "scatter_alpha": 0.5,
     "scatter_size": 10,
-    "config_path":"vp_sde_2d_best_gmm_regularization.pt"
+    "config_path":"vp_sde_2d_best_gmm.pt"
 }
          
 
