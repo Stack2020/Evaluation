@@ -15,6 +15,7 @@ DEFAULT_SETTINGS = {
     "span_sigma": 4.0,
     "batch_size": 512,
     "output_path": Path("density_heatmaps_involute.png"),
+    "plot_bounds": (-6.0, 6.0, -6.0, 6.0),
 }
 
 
@@ -88,19 +89,28 @@ def evaluate_model_log_density(
     return np.concatenate(outputs, axis=0)
 
 
-def build_grid(cfg: dict, *, resolution: int, span_sigma: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def build_grid(
+    cfg: dict,
+    *,
+    resolution: int,
+    span_sigma: float,
+    fixed_bounds: tuple[float, float, float, float] | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Construct a uniform 2D grid covering the involute curve plus a margin.
     span_sigma scales the noise_std to set the margin.
     """
-    r_min, r_max, noise_std = involute_params(cfg)
-    r = np.linspace(r_min, r_max, 2048, dtype=np.float64)
-    base_x = r * np.sin(2.0 * r)
-    base_y = r * np.cos(2.0 * r)
+    if fixed_bounds is not None:
+        x_min, x_max, y_min, y_max = fixed_bounds
+    else:
+        r_min, r_max, noise_std = involute_params(cfg)
+        r = np.linspace(r_min, r_max, 2048, dtype=np.float64)
+        base_x = r * np.sin(2.0 * r)
+        base_y = r * np.cos(2.0 * r)
 
-    margin = span_sigma * noise_std
-    x_min, x_max = float(base_x.min() - margin), float(base_x.max() + margin)
-    y_min, y_max = float(base_y.min() - margin), float(base_y.max() + margin)
+        margin = span_sigma * noise_std
+        x_min, x_max = float(base_x.min() - margin), float(base_x.max() + margin)
+        y_min, y_max = float(base_y.min() - margin), float(base_y.max() + margin)
 
     x_vals = np.linspace(x_min, x_max, resolution)
     y_vals = np.linspace(y_min, y_max, resolution)
@@ -116,6 +126,7 @@ def main() -> None:
     span_sigma: float = settings["span_sigma"]
     batch_size: int = settings["batch_size"]
     output_path: Path = settings["output_path"]
+    plot_bounds: tuple[float, float, float, float] | None = settings["plot_bounds"]
 
     device = get_device()
     model = build_model(config, device)
@@ -129,6 +140,7 @@ def main() -> None:
         merged_config,
         resolution=resolution,
         span_sigma=span_sigma,
+        fixed_bounds=plot_bounds,
     )
 
     r_min, r_max, noise_std = involute_params(merged_config)
@@ -168,66 +180,69 @@ def main() -> None:
     output_dir = output_path.parent if output_path.parent != Path("") else Path(".")
     output_dir.mkdir(parents=True, exist_ok=True)
     suffix = output_path.suffix if output_path.suffix else ".png"
-    base_name = output_path.stem or "density_heatmap"
-    figure_size = (5.0, 4.2)
+    target_path = output_path if output_path.suffix else output_path.with_suffix(suffix)
+    figure_size = (10.0, 3.6)
 
     density_cmap = plt.get_cmap("viridis")
     error_cmap = plt.get_cmap("magma")
 
-    def save_single_plot(
-        data: np.ndarray,
-        title: str,
-        cmap,
-        target_path: Path,
-        colorbar_label: str,
-        vmin: float | None = None,
-        vmax: float | None = None,
-    ) -> None:
-        fig, ax = plt.subplots(figsize=figure_size)
+    fig = plt.figure(figsize=figure_size)
+    gs = fig.add_gridspec(1, 6, width_ratios=[1.0, 0.05, 1.0, 0.05, 1.0, 0.05])
+    ax_analytic = fig.add_subplot(gs[0, 0])
+    cax_analytic = fig.add_subplot(gs[0, 1])
+    ax_model = fig.add_subplot(gs[0, 2])
+    cax_model = fig.add_subplot(gs[0, 3])
+    ax_error = fig.add_subplot(gs[0, 4])
+    cax_error = fig.add_subplot(gs[0, 5])
+
+    fig.subplots_adjust(left=0.06, right=0.98, top=0.90, bottom=0.12, wspace=0.28)
+
+    def draw_panel(ax, cax, data, title, cmap, cbar_label, vmin=None, vmax=None):
         im = ax.pcolormesh(grid_x, grid_y, data, shading="auto", cmap=cmap, vmin=vmin, vmax=vmax)
         ax.set_title(title)
         ax.set_xlabel("x")
         ax.set_ylabel("y")
         ax.set_aspect("equal")
-        cbar = fig.colorbar(im, ax=ax, shrink=0.82)
-        cbar.set_label(colorbar_label)
-        fig.tight_layout()
-        fig.savefig(target_path, dpi=300)
-        plt.close(fig)
+        if plot_bounds is not None:
+            x_min, x_max, y_min, y_max = plot_bounds
+            ax.set_xlim(x_min, x_max)
+            ax.set_ylim(y_min, y_max)
+        cbar = fig.colorbar(im, cax=cax)
+        cbar.set_label(cbar_label)
 
-    analytic_path = output_dir / f"{base_name}_involute_density{suffix}"
-    model_path = output_dir / f"{base_name}_pf_ode_density{suffix}"
-    error_path = output_dir / f"{base_name}_abs_error{suffix}"
-
-    save_single_plot(
+    draw_panel(
+        ax_analytic,
+        cax_analytic,
         analytic_density,
         "Density (Involute)",
         density_cmap,
-        analytic_path,
         "Probability density",
         vmin=density_vmin,
         vmax=density_vmax,
     )
-    save_single_plot(
+    draw_panel(
+        ax_model,
+        cax_model,
         model_density,
         "PF-ODE Density",
         density_cmap,
-        model_path,
         "Probability density",
         vmin=density_vmin,
         vmax=density_vmax,
     )
-    save_single_plot(
+    draw_panel(
+        ax_error,
+        cax_error,
         abs_error,
         "Absolute Error",
         error_cmap,
-        error_path,
         "Absolute error",
     )
 
-    print(f"Saved involute density heatmap to {analytic_path}")
-    print(f"Saved PF-ODE density heatmap to {model_path}")
-    print(f"Saved absolute error heatmap to {error_path}")
+    fig.savefig(target_path, dpi=300)
+    plt.close(fig)
+
+    print(f"Saved density heatmaps panel to {target_path}")
 
 
 if __name__ == "__main__":
