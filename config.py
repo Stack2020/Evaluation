@@ -6,12 +6,9 @@ config = {
     "n_val": 10000,
     "n_test": 5000,
     "n_gen": 5000,
-    #anisotropic
-    "mu": [1.0, -1.0],
-    "sigma": [[1.0, 0.6], [0.6, 1.5]],
-    #isotropic
-    #"mu": [0.0, 0.0],
-    #"sigma": [[1.0, 0.0], [0.0, 1]],
+
+    "eight_gaussian_radius": 1.0,
+    "eight_gaussian_sigma": [[0.02, 0.0], [0.0, 0.02]],
     "beta_min": 0.1,
     "beta_max": 20.0,
     "eps": 1e-3,
@@ -22,7 +19,7 @@ config = {
     "loss_time_gamma": 2.2,
     "loss_time_reweight": False,
     "loss_time_weight_max": 0.0,
-    "hidden": 64,  # 从128增加到256
+    "hidden": 128,  # 从128增加到256
     "layers": 3,   # 从8增加到10
     "t_embed_dim": 64,
     "batch_size": 128,
@@ -31,12 +28,15 @@ config = {
     "weight_decay": 1e-4,
     "clip_grad_norm": 5.0,
     "lambda_gamma": 1.0,  # 降低权重的影响，更平衡地训练所有时间步
+    #正则项惩罚动态调整
+    "curl":True,
+
     "num_steps": 5000,
     "snr": 0.08,
     "corrector_steps": 2,
     "scatter_alpha": 0.5,
     "scatter_size": 10,
-    "config_path":"vp_sde_2d_best.pt"
+    "config_path":"vp_sde_2d_eight_gaussian_regularization.pt"
 }
          
 

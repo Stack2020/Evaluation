@@ -7,9 +7,8 @@ import torch
 from sde import (
     dsm_loss_batch,
     drift_pf,
-    prior_logp_standard_normal,
     divergence_exact,
-    terminal_logp_gaussian
+    prior_logp_standard_normal
     )
 
 
@@ -85,7 +84,7 @@ def integrate_log_probability(
             x = x + 0.5 * dt * (drift_curr_det + drift_next_det)
             accum = accum + 0.5 * dt * (div_curr_det + div_next_det)
 
-        return terminal_logp_gaussian(x, config) + accum
+        return prior_logp_standard_normal(x) + accum
 
     if method_name == "euler":
         x = x0.detach()
@@ -102,7 +101,7 @@ def integrate_log_probability(
             x = x_req.detach() + dt * drift_det
             accum = accum + dt * div_det
 
-        return terminal_logp_gaussian(x, config) + accum
+        return prior_logp_standard_normal(x) + accum
 
     if method_name == "rk45":
         x = x0.detach()
@@ -144,7 +143,7 @@ def integrate_log_probability(
             x = x1.detach() + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
             accum = accum + (dt / 6.0) * (div1_det + 2.0 * div2_det + 2.0 * div3_det + div4_det)
 
-        return terminal_logp_gaussian(x, config) + accum
+        return prior_logp_standard_normal(x) + accum
 
     raise ValueError(
         f"Unsupported integration method '{method}'. Expected one of {{'Heun', 'Euler', 'RK45'}}."

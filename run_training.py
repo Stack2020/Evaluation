@@ -1,10 +1,9 @@
 import torch
-from config import  config, get_device
-from data_loader import build_train_loader, build_val_loader, generate_train_val
+from config import config, get_device
+from eight_gaussian_data_loader import build_train_loader, build_val_loader, generate_train_val
 from model import build_model
 from train import train_model
 from util import set_seed
-
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -26,8 +25,9 @@ def main() -> None:
    
     print(f"Params: {sum(p.numel() for p in model.parameters()):.1f}")
 
-    train_loader = build_train_loader(train_tensor, config["batch_size"], seed=seed)
-    val_loader = build_val_loader(val_tensor, config["batch_size"], seed=seed)
+    train_loader = build_train_loader(train_tensor, config["batch_size"])
+    
+    val_loader = build_val_loader(val_tensor, config["batch_size"])
 
     train_model(
         model,
@@ -35,8 +35,7 @@ def main() -> None:
         device,
         train_loader,
         val_loader,
-        config["config_path"],
-        enable_nll=False)
+        config["config_path"])
 
 if __name__ == "__main__":
     main()
