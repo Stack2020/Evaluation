@@ -40,7 +40,7 @@ config = {
     "corrector_steps": 2,
     "scatter_alpha": 0.5,
     "scatter_size": 10,
-    "config_path": "vp_sde_wrap_regularization.pt",
+    "config_path": "vp_sde_wrap_best.pt",
 }
 
 

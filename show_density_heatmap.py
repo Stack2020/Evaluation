@@ -169,7 +169,7 @@ def main() -> None:
     model_density = np.exp(model_log_density)
 
     plt.style.use("seaborn-v0_8")
-    fig, axes = plt.subplots(1, 3, figsize=(10, 4))
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.8), constrained_layout=True)
 
     density_cmap = plt.get_cmap("viridis")
     error_cmap = plt.get_cmap("magma")
@@ -177,17 +177,17 @@ def main() -> None:
     title_suffix = "Banana" if dist == "banana" else "Gaussian"
 
     im0 = axes[0].pcolormesh(grid_x, grid_y, analytic_density, shading="auto", cmap=density_cmap)
-    axes[0].set_title(f" Density ({title_suffix})")
-    axes[0].set_xlabel("x1")
-    axes[0].set_ylabel("x2")
+    axes[0].set_title("Ground Truth Density")
+    axes[0].set_xlabel("x")
+    axes[0].set_ylabel("y")
     axes[0].set_xlim(x_limits)
     axes[0].set_ylim(y_limits)
     fig.colorbar(im0, ax=axes[0], shrink=0.8)
 
     im1 = axes[1].pcolormesh(grid_x, grid_y, model_density, shading="auto", cmap=density_cmap)
     axes[1].set_title("PF-ODE Density")
-    axes[1].set_xlabel("x1")
-    axes[1].set_ylabel("x2")
+    axes[1].set_xlabel("x")
+    axes[1].set_ylabel("y")
     axes[1].set_xlim(x_limits)
     axes[1].set_ylim(y_limits)
     fig.colorbar(im1, ax=axes[1], shrink=0.8)
@@ -195,11 +195,15 @@ def main() -> None:
     abs_error = np.abs(model_density - analytic_density)
     im2 = axes[2].pcolormesh(grid_x, grid_y, abs_error, shading="auto", cmap=error_cmap)
     axes[2].set_title("Absolute Error")
-    axes[2].set_xlabel("x1")
-    axes[2].set_ylabel("x2")
+    axes[2].set_xlabel("x")
+    axes[2].set_ylabel("y")
     axes[2].set_xlim(x_limits)
     axes[2].set_ylim(y_limits)
     fig.colorbar(im2, ax=axes[2], shrink=0.8)
+
+    for ax in axes:
+        ax.set_aspect("equal")
+
     fig.savefig(output_path, dpi=300)
     print(f"Saved heatmaps to {output_path}")
 
