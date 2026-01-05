@@ -181,10 +181,13 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     suffix = output_path.suffix if output_path.suffix else ".png"
     target_path = output_path if output_path.suffix else output_path.with_suffix(suffix)
-    figure_size = (10.0, 3.6)
+    figure_size = (11.2, 3.6)
 
     density_cmap = plt.get_cmap("viridis")
     error_cmap = plt.get_cmap("magma")
+    colorbar_height_frac = 0.85
+    colorbar_width_scale = 0.8
+    colorbar_left_shift = 0.03  # move colorbars left (figure coords) to avoid overlap
 
     fig = plt.figure(figsize=figure_size)
     gs = fig.add_gridspec(1, 6, width_ratios=[1.0, 0.05, 1.0, 0.05, 1.0, 0.05])
@@ -208,7 +211,14 @@ def main() -> None:
             ax.set_xlim(x_min, x_max)
             ax.set_ylim(y_min, y_max)
         cbar = fig.colorbar(im, cax=cax)
-        cbar.set_label(cbar_label)
+        if cbar_label:
+            cbar.set_label(cbar_label)
+        cax_box = cax.get_position()
+        new_width = cax_box.width * colorbar_width_scale
+        new_height = cax_box.height * colorbar_height_frac
+        new_x0 = max(cax_box.x0 - colorbar_left_shift, 0.0)
+        new_y0 = cax_box.y0 + (cax_box.height - new_height) * 0.5
+        cax.set_position([new_x0, new_y0, new_width, new_height])
 
     draw_panel(
         ax_analytic,
@@ -216,7 +226,7 @@ def main() -> None:
         analytic_density,
         "Density (Involute)",
         density_cmap,
-        "Probability density",
+        "",
         vmin=density_vmin,
         vmax=density_vmax,
     )
@@ -226,7 +236,7 @@ def main() -> None:
         model_density,
         "PF-ODE Density",
         density_cmap,
-        "Probability density",
+        "",
         vmin=density_vmin,
         vmax=density_vmax,
     )
@@ -236,7 +246,7 @@ def main() -> None:
         abs_error,
         "Absolute Error",
         error_cmap,
-        "Absolute error",
+        "",
     )
 
     fig.savefig(target_path, dpi=300)
