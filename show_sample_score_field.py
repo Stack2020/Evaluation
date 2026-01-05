@@ -2,10 +2,53 @@ import math
 import numpy as np
 import torch
 from config import config, get_device
-from data_loader import generate_test
+from miniboone_data_loader import load_miniboone_array, split_dataset, z_standardize
 from model import build_model
-from sample import load_checkpoint
 from sde import forward_perturb, v_to_score
+
+
+def load_miniboone_test_set(cfg: dict) -> tuple[np.ndarray, int, dict[str, np.ndarray | int]]:
+    """
+    Load and z-standardize the MiniBooNE test split, returning a deterministic subset
+    for evaluating residuals.
+    """
+    data_path = cfg.get("miniboone_path", "./data/miniboone.npy")
+    train_ratio = float(cfg.get("train_ratio", 0.8))
+    val_ratio = float(cfg.get("val_ratio", 0.1))
+    test_ratio = float(cfg.get("test_ratio", 0.1))
+    seed = int(cfg.get("seed", 42))
+
+    data = load_miniboone_array(data_path)
+    train_raw, val_raw, test_raw = split_dataset(
+        data,
+        train_ratio=train_ratio,
+        val_ratio=val_ratio,
+        test_ratio=test_ratio,
+        seed=seed,
+    )
+    train_z, _val_z, test_z, mean, std = z_standardize(train_raw, val_raw, test_raw)
+
+    data_dim = int(test_raw.shape[1]) if test_raw.ndim > 1 else 1
+
+    eval_points_cfg = cfg.get("residual_eval_points", cfg.get("density_eval_points"))
+    eval_points = test_z.shape[0] if eval_points_cfg is None else int(eval_points_cfg)
+    eval_points = max(1, min(eval_points, test_z.shape[0]))
+
+    subset_seed = int(seed + int(cfg.get("eval_seed_offset", 0)))
+    if eval_points < test_z.shape[0]:
+        rng = np.random.default_rng(subset_seed)
+        idx = rng.choice(test_z.shape[0], size=eval_points, replace=False)
+        test_eval = test_z[idx]
+    else:
+        test_eval = test_z
+
+    stats = {
+        "num_total": int(test_z.shape[0]),
+        "num_eval": int(eval_points),
+        "mean": mean,
+        "std": std,
+    }
+    return test_eval.astype(np.float32, copy=False), data_dim, stats
 
 def compute_rot_residual_batch(
     model: torch.nn.Module,
@@ -49,18 +92,27 @@ def compute_rot_residual_batch(
 
 def main() -> None:
     device = get_device()
-    model = build_model(config, device)
-    checkpoint = load_checkpoint(model, str(config["config_path"]), device)
+    checkpoint_path = str(config["config_path"])
+    checkpoint = torch.load(checkpoint_path, map_location=device)
     ckpt_cfg = checkpoint.get("config", {})
     merged_cfg = config.copy()
     merged_cfg.update(ckpt_cfg)
-    merged_cfg["config_path"] = str(config["config_path"])
+    merged_cfg["config_path"] = checkpoint_path
 
-    # Base samples x0 drawn from the test set; evaluate residual directly on x0
-    test_np = generate_test(merged_cfg, seed=int(merged_cfg.get("eval_seed_offset", 0)))
+    # MiniBooNE: standardize with train statistics, then take a deterministic eval subset.
+    test_np, data_dim, data_stats = load_miniboone_test_set(merged_cfg)
+    if int(merged_cfg.get("data_dim", data_dim)) != data_dim:
+        print(f"Updating data_dim from {merged_cfg.get('data_dim')} to {data_dim}")
+    merged_cfg["data_dim"] = data_dim
+
+    model = build_model(merged_cfg, device)
+    model.load_state_dict(checkpoint["model"])
+
     test_tensor = torch.from_numpy(test_np).to(device=device, dtype=torch.float32)
 
-    times = np.arange(0.01, 1.0 + 1e-9, 0.01, dtype=np.float32)
+    eps = float(merged_cfg.get("eps", 1e-3))
+    t_start = max(eps, 0.01)
+    times = np.arange(t_start, 1.0 + 1e-9, 0.01, dtype=np.float32)
     batch_size = int(merged_cfg.get("score_batch_size", 512))
 
     model.eval()
@@ -73,14 +125,19 @@ def main() -> None:
             rot = compute_rot_residual_batch(model, merged_cfg, device, xb, float(t_val))
             rot_list.append(rot)
         rot_vals = np.concatenate(rot_list, axis=0)
-        per_time_means.append(float(rot_vals.mean()))
+        mean_val = float(rot_vals.mean())
+        per_time_means.append(mean_val)
+        print(f"t={t_val:.4f} mean_rot_residual={mean_val:.6e}")
 
     per_time_means = np.asarray(per_time_means, dtype=np.float64)
     agg_value = float(per_time_means.mean())
 
-    print(f"Times: {times.shape[0]} points from 0.01 to 1.00 (step 0.01)")
-    print(f"Test samples (spatial probes): {test_np.shape[0]}")
-    print(f"Mean rotational residual over test x_t and time: {agg_value:.6e}")
+    print(f"Times: {times.shape[0]} points from {times[0]:.4f} to {times[-1]:.4f} (step 0.01)")
+    print(
+        f"MiniBooNE test probes (z-standardized): {test_np.shape[0]} "
+        f"(full test_z={data_stats['num_total']})"
+    )
+    print(f"Mean rotational residual over MiniBooNE x_t and time: {agg_value:.6e}")
 
 
 if __name__ == "__main__":
