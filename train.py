@@ -62,7 +62,17 @@ def train_model(
     val_loader,
     checkpoint_path: str,
 ) -> None:
-    lambda_curl = float(config.get("lambda_curl", 0.0))
+    curl_flag = config.get("curl", False)
+
+    def lambda_curl(t: torch.Tensor) -> torch.Tensor:
+        """Time-dependent curl regularization weight."""
+        lambda_max=0.1
+        t_cutoff = 0.1     
+        k = 120
+        return lambda_max* torch.sigmoid(-k * (t-t_cutoff))
+
+    if curl_flag:
+        print(f"Using curl regularization schedule")
     # ----- Optimizer -----
     optimizer = AdamW(
         model.parameters(),
@@ -116,8 +126,8 @@ def train_model(
             xb = xb.to(device, non_blocking=True)
 
             loss = dsm_loss_batch(model, xb, config)
-            
-            if lambda_curl > 0.0:
+
+            if curl_flag:
                 eps = float(config.get("eps", 1e-3))
                 gamma = float(config.get("loss_time_gamma", 1.0))
                 u = torch.rand(xb.shape[0], device=xb.device, dtype=xb.dtype)
@@ -140,8 +150,9 @@ def train_model(
                         )[0]
                         jac_rows.append(grad.unsqueeze(1))
                     jac = torch.cat(jac_rows, dim=1)
-                    curl_pen = ((jac - jac.transpose(1, 2)) ** 2).sum(dim=(1, 2)).mean()
-                    loss = loss + lambda_curl * curl_pen
+                    curl_pen_batch = ((jac - jac.transpose(1, 2)) ** 2).sum(dim=(1, 2))
+                    curl_pen = (lambda_curl(t) * curl_pen_batch).mean()
+                    loss = loss + curl_pen
 
             optimizer.zero_grad(set_to_none=True)
             
