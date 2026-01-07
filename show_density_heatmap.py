@@ -84,6 +84,12 @@ def build_grid(
     return grid_x, grid_y, grid_points
 
 
+def sanitize_for_plot(arr: np.ndarray, *, fill_value: float = 0.0) -> np.ndarray:
+    """Replace NaN/Inf with a finite fill value to avoid blank patches in pcolormesh."""
+    cleaned = np.nan_to_num(arr, nan=fill_value, posinf=fill_value, neginf=fill_value)
+    return np.clip(cleaned, a_min=0.0, a_max=None)
+
+
 def main() -> None:
     seed = int(config.get("seed", 42))
     set_seed(seed)
@@ -156,7 +162,7 @@ def main() -> None:
         mean, cov = get_distribution_stats(merged_config)
         analytic_log_density = gaussian_log_density(grid_points, mean, cov).reshape(grid_x.shape)
     
-    analytic_density = np.exp(analytic_log_density)
+    analytic_density = sanitize_for_plot(np.exp(analytic_log_density))
 
     steps_eval = int(steps_override or merged_config.get("density_eval_steps", 600))
     eps_eval = float(eps_override or merged_config.get("nll_eval_eps", merged_config.get("eps", 1e-3)))
@@ -172,9 +178,9 @@ def main() -> None:
         method=method,
         batch_size=max(1, batch_size),
     ).reshape(grid_x.shape)
-    model_density = np.exp(model_log_density)
+    model_density = sanitize_for_plot(np.exp(model_log_density))
 
-    abs_error = np.abs(model_density - analytic_density)
+    abs_error = sanitize_for_plot(np.abs(model_density - analytic_density))
 
     density_vmin = float(np.nanmin(np.stack([analytic_density, model_density])))
     density_vmax = float(np.nanmax(np.stack([analytic_density, model_density])))
