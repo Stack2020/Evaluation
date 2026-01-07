@@ -64,7 +64,7 @@ def main() -> None:
     test_np = generate_test(cfg, seed=int(cfg.get("eval_seed_offset", 0))).astype(np.float32)
     batch_size = int(cfg.get("score_batch_size", 512))
     
-    steps_list: Iterable[int] = (50, 100, 150, 200, 250, 300)
+    steps_list: Iterable[int] = (100,200,300,500,700,800)
 
     mean = np.asarray(cfg["mu"], dtype=np.float64)
     cov = np.asarray(cfg["sigma"], dtype=np.float64)
