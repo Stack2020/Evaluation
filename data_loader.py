@@ -4,13 +4,11 @@ import numpy as np
 import torch
 import torch.utils.data as tud
 
-
 def banana_forward(z: np.ndarray, a: float) -> np.ndarray:
     """Warp standard Gaussian samples into the banana distribution."""
     x1 = z[..., 0]
     x2 = z[..., 1] + a * (x1 **2 - 1.0)
     return np.stack((x1, x2), axis=-1)
-
 
 def banana_inverse(x: np.ndarray, a: float) -> np.ndarray:
     """Inverse warp used for analytic density computation."""

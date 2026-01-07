@@ -36,7 +36,7 @@ def show_sample_scatter(
     finite_mask = np.isfinite(combined).all(axis=1)
 
     valid = combined[finite_mask]
-
+    
     if valid.size == 0:
         x_limits = (-1.0, 1.0)
         y_limits = (-1.0, 1.0)
