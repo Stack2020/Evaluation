@@ -5,10 +5,12 @@ from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 from sde import dsm_loss_batch, forward_perturb, v_to_score
 from util import evaluation_loss
 
+
 def build_scheduler_after_reset(optimizer, config, remaining_epochs: int):
-    eta_min = float(config.get("lr_min", 1e-6))          # 比 0.1*lr 更激进
+    eta_min = float(config.get("lr_min", 1e-6))  # 比 0.1*lr 更激进
     T_max_after = int(config.get("T_max_after_reset", min(30, max(1, remaining_epochs))))
     return CosineAnnealingLR(optimizer, T_max=max(1, T_max_after), eta_min=eta_min)
+
 
 class EMA:
     def __init__(self, model: torch.nn.Module, decay: float = 0.999):
@@ -55,21 +57,21 @@ class EMA:
 
 
 def train_model(
-    model: torch.nn.Module,
-    config: Dict,
-    device: torch.device,
-    train_loader,
-    val_loader,
-    checkpoint_path: str,
+        model: torch.nn.Module,
+        config: Dict,
+        device: torch.device,
+        train_loader,
+        val_loader,
+        checkpoint_path: str,
 ) -> None:
     curl_flag = config.get("curl", False)
 
     def lambda_curl(t: torch.Tensor) -> torch.Tensor:
         """Time-dependent curl regularization weight."""
-        lambda_max=0.1
-        t_cutoff = 0.1     
+        lambda_max = 0.1
+        t_cutoff = 0.1
         k = 120
-        return lambda_max* torch.sigmoid(-k * (t-t_cutoff))
+        return lambda_max * torch.sigmoid(-k * (t - t_cutoff))
 
     if curl_flag:
         print(f"Using curl regularization schedule")
@@ -91,7 +93,7 @@ def train_model(
     )
 
     eta_min = float(config.get("lr_min", 1e-5))  # 比 0.1*lr 更激进，利于跳出 plateau
-    
+
     cos = CosineAnnealingLR(
         optimizer,
         T_max=max(1, total_epochs - warmup_epochs),
@@ -103,7 +105,7 @@ def train_model(
     # ----- Early stop / plateau 控制 -----
     best_metric = float("inf")
 
-    patience = int(config.get("degradation_patience",100))
+    patience = int(config.get("degradation_patience", 100))
     min_delta = float(config.get("min_improve_delta", 0.0))
     target_loss = float(config.get("target_loss", 0.1))
     epochs_no_improve = 0
@@ -155,7 +157,7 @@ def train_model(
                     loss = loss + curl_pen
 
             optimizer.zero_grad(set_to_none=True)
-            
+
             loss.backward()
 
             total_grad_norm = torch.nn.utils.clip_grad_norm_(
@@ -180,7 +182,6 @@ def train_model(
                     f"train_loss {loss.item():.4f} "
                     f"grad_norm {grad_norm_val:.4f} "
                 )
-            
 
         train_loss = running / num_batches
 
@@ -200,7 +201,7 @@ def train_model(
         if val_metric < best_metric - min_delta:
             best_metric = float(val_metric)
             to_save = ema.ema_state_dict(model) if ema is not None else model.state_dict()
-            
+
             torch.save(
                 {
                     "model": to_save,

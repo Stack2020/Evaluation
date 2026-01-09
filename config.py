@@ -1,7 +1,6 @@
 import torch
-
 config = {
-    "seed": 42,
+    "seed": 50,
     "beta_min": 0.1,
     "beta_max": 20.0,
     "eps": 1e-3,
@@ -14,17 +13,17 @@ config = {
     "loss_time_reweight": True,     # reweight to emphasize late times
     "loss_time_weight_max": 5.0,    # clamp weight to avoid extremes
     
-    "hidden": 512,
-    "layers":6,
+    "hidden": [64,128,256,512,1024],
+    "layers": 5,
     "t_embed_dim": 128,
 
     "batch_size": 128,
-    "epochs": 4500,
+    "epochs": 3500,
     "lr": 1e-3,
     "lr_min": 1e-4,                 # keep lr from decaying too low
     "reset_lr": 8e-4,               # plateau时重置到的lr
     "weight_decay": 1e-5,
-    "clip_grad_norm": 15.0,
+    "clip_grad_norm": 18.0,
     #正则项惩罚动态调整
     "curl":True,
 
@@ -36,7 +35,7 @@ config = {
     "num_steps": 4000,
     "snr": 0.08,
     "corrector_steps": 2,
-    "config_path": "vp_sde_miniboone_regularization.pt",
+    "config_path": "vp_sde_best_miniboone_regularization_median.pt",
     "miniboone_path": "./data/miniboone.npy"
 }
 
