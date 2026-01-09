@@ -1,3 +1,4 @@
+from typing import Sequence
 import torch
 import torch.nn as nn
 class TimeEmbedding(nn.Module):
@@ -12,14 +13,30 @@ class TimeEmbedding(nn.Module):
 
 
 class ScoreNet(nn.Module):
-    def __init__(self, hidden: int = 128, layers: int = 3, t_embed_dim: int = 32):
+    def __init__(
+        self,
+        hidden: int | Sequence[int] = 128,
+        layers: int = 3,
+        t_embed_dim: int = 32,
+    ) -> None:
         super().__init__()
         self.temb = TimeEmbedding(t_embed_dim)
         in_dim = 2 + t_embed_dim
-        modules = [nn.Linear(in_dim, hidden), nn.SiLU()]
-        for _ in range(layers - 1):
-            modules.extend([nn.Linear(hidden, hidden), nn.SiLU()])
-        modules.append(nn.Linear(hidden, 2))
+
+        if isinstance(hidden, Sequence) and not isinstance(hidden, (str, bytes)):
+            hidden_dims = [int(h) for h in hidden]
+        else:
+            hidden_dims = [int(hidden)] * int(layers)
+
+        if not hidden_dims:
+            raise ValueError("At least one hidden dimension is required for ScoreNet.")
+
+        dims = [in_dim, *hidden_dims, 2]
+        modules: list[nn.Module] = []
+        for in_size, out_size in zip(dims[:-1], dims[1:]):
+            modules.append(nn.Linear(in_size, out_size))
+            if out_size != 2:
+                modules.append(nn.SiLU())
         self.net = nn.Sequential(*modules)
 
     def forward(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:

@@ -1,11 +1,10 @@
 import torch
 config = {
     "seed": 42,
-    "n_gen":60000,
-    "n_train": 50000,
+    "n_train": 100000,
     "n_val": 10000,
-    "n_test": 5000,
-    "n_gen": 5000,
+    "n_test": 10000,
+    "n_gen": 10000,
     #anisotropic
     "mu": [1.0, -1.0],
     "sigma": [[1.0, 0.6], [0.6, 1.5]],
@@ -22,12 +21,12 @@ config = {
     "loss_time_gamma": 2.2,
     "loss_time_reweight": False,
     "loss_time_weight_max": 0.0,
-    "hidden": 64,  # 从128增加到256
-    "layers": 3,   # 从8增加到10
+    "hidden": [64,128,128,256],
+    "layers": 4,
     "t_embed_dim": 64,
     "batch_size": 128,
-    "epochs": 3000,  # 训练更久
-    "lr": 1e-3,      # 降低学习率，更稳定
+    "epochs": 3500,   
+    "lr": 1e-3,       
     "weight_decay": 1e-4,
     "clip_grad_norm": 5.0,
     "lambda_gamma": 1.0,  # 降低权重的影响，更平衡地训练所有时间步
@@ -36,7 +35,7 @@ config = {
     "corrector_steps": 2,
     "scatter_alpha": 0.5,
     "scatter_size": 10,
-    "config_path":"vp_sde_2d_best.pt"
+    "config_path":"vp_sde_best_regularization.pt"
 }
          
 
