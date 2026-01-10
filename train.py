@@ -66,9 +66,9 @@ def train_model(
 
     def lambda_curl(t: torch.Tensor) -> torch.Tensor:
         """Time-dependent curl regularization weight."""
-        lambda_max=config.get("lambda_max", 0.01)
-        t_cutoff = config.get("t_cutoff", 0.01)     
-        k =config.get("k", 0.01)     
+        lambda_max=config.get("lambda_max", 0.1)
+        t_cutoff = config.get("t_cutoff", 0.1)     
+        k =config.get("k", 120)     
         return lambda_max* torch.sigmoid(-k * (t-t_cutoff))
 
     if curl_flag:

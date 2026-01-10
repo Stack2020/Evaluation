@@ -5,7 +5,7 @@ import numpy as np
 import torch
 
 config = {
-    "seed": 42,
+    "seed": 45,
     "n_train": 100000,
     "n_val": 10000,
     "n_test": 10000,
@@ -34,9 +34,9 @@ config = {
     "weight_decay": 1e-4,
     "clip_grad_norm": 5.0,
     "lambda_gamma": 1.0,
-    # 姝ｅ垯椤规儵缃氬姩鎬佽皟鏁?
+
     "curl": True,
-    "lambda_max": 0.00001,
+    "lambda_max": 0.1,
     "t_cutoff": 0.1,
     "k": 120,
     "num_steps": 5000,
@@ -45,7 +45,7 @@ config = {
     "scatter_alpha": 0.5,
     "scatter_size": 10,
     "density_method": "heun",
-    "config_path": "vp_sde_best_involute_regularization.pt",
+    "config_path": "vp_sde_involute_regularization_low.pt",
 }
 
 

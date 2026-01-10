@@ -93,7 +93,7 @@ def main() -> None:
     test_np = generate_test(cfg, seed=int(cfg.get("eval_seed_offset", 0))).astype(np.float32)
     batch_size = int(cfg.get("score_batch_size", 512))
 
-    steps_list: Iterable[int] = (100, 200, 250, 500,800,1200)
+    steps_list: Iterable[int] = (100,200,250,500)
 
     r_min, r_max, noise_std = involute_params(cfg)
     analytic_logp = involute_log_density(
