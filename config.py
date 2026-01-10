@@ -4,8 +4,8 @@ BANANA_A = 1.0
 BANANA_VAR2 = 1.0 + 2.0 * (BANANA_A ** 2)
 
 config = {
-    "seed": 52,
-    "distribution": "banana",  # target data distribution
+    "seed": 42,
+    "distribution": "banana", # target data distribution
     "banana_a": BANANA_A,
     "mu": [0.0, 0.0],
     "sigma": [[1.0, 0.0], [0.0, BANANA_VAR2]],
@@ -46,7 +46,7 @@ config = {
     "scatter_alpha": 0.5,
     "scatter_size": 10,
     "density_method":"heun",
-    "config_path": "vp_sde_best_wrap_regularization_high.pt"
+    "config_path": "vp_sde_best_wrap_regularization.pt"
 }
 
 
