@@ -66,9 +66,9 @@ def train_model(
 
     def lambda_curl(t: torch.Tensor) -> torch.Tensor:
         """Time-dependent curl regularization weight."""
-        lambda_max=0.1
-        t_cutoff = 0.1     
-        k = 120
+        lambda_max=config.get("lambda_max", 0.01)
+        t_cutoff = config.get("t_cutoff", 0.01)     
+        k =config.get("k", 0.01)     
         return lambda_max* torch.sigmoid(-k * (t-t_cutoff))
 
     if curl_flag:
@@ -103,7 +103,7 @@ def train_model(
     # ----- Early stop / plateau 控制 -----
     best_metric = float("inf")
 
-    patience = int(config.get("degradation_patience",100))
+    patience = int(config.get("degradation_patience",60))
     min_delta = float(config.get("min_improve_delta", 0.0))
     target_loss = float(config.get("target_loss", 0.1))
     epochs_no_improve = 0
