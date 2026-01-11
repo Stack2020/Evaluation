@@ -6,7 +6,7 @@ from typing import Iterable, List
 import numpy as np
 import torch
 
-from config import config as base_config, get_device
+from config import config as base_config, ensure_moments, get_device
 from data_loader import generate_test
 from model import build_model
 from sample import load_checkpoint, pc_sample, pf_sample
@@ -185,7 +185,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    cfg = dict(base_config)
+    cfg = ensure_moments(dict(base_config))
     seed = int(cfg.get("seed", 42) if args.seed is None else args.seed)
     set_seed(seed)
     
@@ -193,7 +193,7 @@ def main() -> None:
     model = build_model(cfg, device)
 
     checkpoint = load_checkpoint(model, cfg["config_path"], device)
-    ckpt_cfg = checkpoint.get("config", cfg)
+    ckpt_cfg = ensure_moments(dict(checkpoint.get("config", cfg)))
 
     n_gen = int(ckpt_cfg.get("n_gen", 5000) if args.num_gen is None else args.num_gen)
 
@@ -234,12 +234,12 @@ def main() -> None:
     print(
         " ".join(
             [
-                f"{moment_stats['mu_diff']:.6f}",
-                f"{moment_stats['sigma_diff']:.6f}",
-                f"{energy_stat}",
-                f"{mmd_stat}",
-                f"{results['energy_p']:.6f}",
-                f"{results['mmd_p']:.6f}",
+                f"{moment_stats['mu_diff']:.16f}",
+                f"{moment_stats['sigma_diff']:.16f}",
+                f"{energy_stat:.16f}",
+                f"{mmd_stat:.16f}",
+                f"{results['energy_p']:.16f}",
+                f"{results['mmd_p']:.16f}",
             ]
         )
     )
