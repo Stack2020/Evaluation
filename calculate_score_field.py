@@ -18,6 +18,8 @@ __all__ = [
     "merge_config",
     "build_grid",
     "build_time_dependent_grid",
+    "build_fixed_range_grid",
+    "build_time_scaled_grid",
     "validate_times",
     "compute_fields",
     "calculate_score_field",
@@ -39,6 +41,23 @@ def build_grid(cfg: dict, resolution: int, span_sigma: float) -> tuple[np.ndarra
     span = span_sigma * std
     x_vals = np.linspace(mean[0] - span[0], mean[0] + span[0], resolution)
     y_vals = np.linspace(mean[1] - span[1], mean[1] + span[1], resolution)
+    grid_x, grid_y = np.meshgrid(x_vals, y_vals, indexing="xy")
+    grid_points = np.column_stack((grid_x.ravel(), grid_y.ravel()))
+    return grid_x, grid_y, grid_points
+
+
+def build_fixed_range_grid(
+    min_val: float,
+    max_val: float,
+    resolution: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Construct a fixed square grid covering [min_val, max_val] on both axes."""
+    lo = float(min_val)
+    hi = float(max_val)
+    if hi <= lo:
+        raise ValueError("max_val must be greater than min_val for fixed grid.")
+    x_vals = np.linspace(lo, hi, resolution, dtype=np.float64)
+    y_vals = np.linspace(lo, hi, resolution, dtype=np.float64)
     grid_x, grid_y = np.meshgrid(x_vals, y_vals, indexing="xy")
     grid_points = np.column_stack((grid_x.ravel(), grid_y.ravel()))
     return grid_x, grid_y, grid_points
@@ -82,6 +101,41 @@ def build_time_dependent_grid(
 
     x_vals = np.linspace(mean_t[0] - span[0], mean_t[0] + span[0], resolution)
     y_vals = np.linspace(mean_t[1] - span[1], mean_t[1] + span[1], resolution)
+    grid_x, grid_y = np.meshgrid(x_vals, y_vals, indexing="xy")
+    grid_points = np.column_stack((grid_x.ravel(), grid_y.ravel()))
+    return grid_x, grid_y, grid_points
+
+
+def build_time_scaled_grid(
+    cfg: dict,
+    resolution: int,
+    base_range: tuple[float, float],
+    t_val: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Time-varying grid that scales a base range according to the marginal std at time t."""
+    lo, hi = base_range
+    if hi <= lo:
+        raise ValueError("base_range must satisfy hi > lo.")
+    beta_min = float(cfg["beta_min"])
+    beta_max = float(cfg["beta_max"])
+    lambda_t = beta_min * t_val + 0.5 * (beta_max - beta_min) * t_val * t_val
+    alpha_bar_t = math.exp(-lambda_t)
+
+    mean0 = np.asarray(cfg["mu"], dtype=np.float64)
+    cov0 = np.asarray(cfg["sigma"], dtype=np.float64)
+    std0 = np.sqrt(np.diag(cov0))
+    eye = np.eye(mean0.shape[0], dtype=np.float64)
+
+    mean_t = math.sqrt(alpha_bar_t) * mean0
+    cov_t = alpha_bar_t * cov0 + (1.0 - alpha_bar_t) * eye
+    std_t = np.sqrt(np.diag(cov_t))
+    scale = np.where(std0 > 0.0, std_t / std0, 1.0)
+
+    base_half = 0.5 * (hi - lo)
+    span_x = base_half * float(scale[0])
+    span_y = base_half * float(scale[1])
+    x_vals = np.linspace(mean_t[0] - span_x, mean_t[0] + span_x, resolution, dtype=np.float64)
+    y_vals = np.linspace(mean_t[1] - span_y, mean_t[1] + span_y, resolution, dtype=np.float64)
     grid_x, grid_y = np.meshgrid(x_vals, y_vals, indexing="xy")
     grid_points = np.column_stack((grid_x.ravel(), grid_y.ravel()))
     return grid_x, grid_y, grid_points
@@ -182,6 +236,7 @@ def calculate_score_field(
     batch_size: int,
     output_path: Path | None = None,
     time_varying_grid: bool = True,
+    fixed_range: tuple[float, float] | None = None,
 ) -> dict[str, np.ndarray]:
     device = get_device()
     checkpoint = torch.load(checkpoint_path, map_location=device)
@@ -192,9 +247,21 @@ def calculate_score_field(
     validated_times = validate_times(times, eps)
 
     if time_varying_grid:
-        grid_builder = lambda t: build_time_dependent_grid(merged_config, resolution, span_sigma, float(t))
+        if fixed_range is not None:
+            grid_builder = lambda t: build_time_scaled_grid(
+                merged_config,
+                resolution,
+                fixed_range,
+                float(t),
+            )
+        else:
+            grid_builder = lambda t: build_time_dependent_grid(merged_config, resolution, span_sigma, float(t))
     else:
-        grid_x, grid_y, grid_points = build_grid(merged_config, resolution, span_sigma)
+        if fixed_range is not None:
+            lo, hi = fixed_range
+            grid_x, grid_y, grid_points = build_fixed_range_grid(lo, hi, resolution)
+        else:
+            grid_x, grid_y, grid_points = build_grid(merged_config, resolution, span_sigma)
         grid_builder = lambda _t: (grid_x, grid_y, grid_points)
 
     scores, residuals, grid_x_out, grid_y_out = compute_fields(
