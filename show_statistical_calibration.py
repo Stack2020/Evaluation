@@ -234,12 +234,12 @@ def main() -> None:
     print(
         " ".join(
             [
-                f"{moment_stats['mu_diff']:.6f}",
-                f"{moment_stats['sigma_diff']:.6f}",
-                f"{energy_stat}",
-                f"{mmd_stat}",
-                f"{results['energy_p']:.6f}",
-                f"{results['mmd_p']:.6f}",
+                f"{moment_stats['mu_diff']:.16f}",
+                f"{moment_stats['sigma_diff']:.16f}",
+                f"{energy_stat:.16f}",
+                f"{mmd_stat:.16f}",
+                f"{results['energy_p']:.16f}",
+                f"{results['mmd_p']:.16f}",
             ]
         )
     )
