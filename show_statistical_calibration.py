@@ -7,9 +7,9 @@ import numpy as np
 import torch
 
 from config import config as base_config, get_device
-from data_loader import generate_test
+from miniboone_data_loader import generate_test
 from model import build_model
-from sample import load_checkpoint, pc_sample, pf_sample
+from sample import pc_sample, pf_sample
 from util import set_seed
 
 
@@ -122,6 +122,17 @@ def summarize_moments(gen_np: np.ndarray, target_mu: np.ndarray, target_sigma: n
     }
 
 
+def compute_target_stats(test_np: np.ndarray, cfg: dict) -> tuple[np.ndarray, np.ndarray]:
+    """Return target mean/covariance; fall back to empirical test stats if absent in cfg."""
+    if "mu" in cfg and "sigma" in cfg:
+        mu = np.asarray(cfg["mu"], dtype=np.float64)
+        sigma = np.asarray(cfg["sigma"], dtype=np.float64)
+        return mu, sigma
+    mu = np.mean(test_np, axis=0, dtype=np.float64)
+    sigma = np.cov(test_np, rowvar=False)
+    return mu, sigma
+
+
 def run_tests(
     test_np: np.ndarray,
     gen_np: np.ndarray,
@@ -190,14 +201,27 @@ def main() -> None:
     set_seed(seed)
     
     device = get_device()
-    model = build_model(cfg, device)
 
-    checkpoint = load_checkpoint(model, cfg["config_path"], device)
-    ckpt_cfg = checkpoint.get("config", cfg)
+    # Load checkpoint config first to align model dimensions with saved weights.
+    checkpoint_path = str(cfg["config_path"])
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    ckpt_cfg = dict(checkpoint.get("config", {}))
+
+    merged_cfg = dict(cfg)
+    merged_cfg.update(ckpt_cfg)
+    merged_cfg["config_path"] = checkpoint_path
+
+    # MiniBooNE: determine data_dim from standardized test split to avoid shape mismatch.
+    test_np = generate_test(merged_cfg, seed=seed)
+    data_dim = int(test_np.shape[1]) if test_np.ndim > 1 else 1
+    merged_cfg["data_dim"] = data_dim
+
+    model = build_model(merged_cfg, device)
+    model.load_state_dict(checkpoint["model"])
+
+    ckpt_cfg = merged_cfg
 
     n_gen = int(ckpt_cfg.get("n_gen", 5000) if args.num_gen is None else args.num_gen)
-
-    test_np = generate_test(ckpt_cfg, seed=seed)
 
     with torch.no_grad():
         if args.method == "pf":
@@ -213,9 +237,7 @@ def main() -> None:
         seed=seed,
     )
 
-    n_test = test_np.shape[0]
-    target_mu = np.asarray(ckpt_cfg.get("mu", cfg["mu"]), dtype=np.float64)
-    target_sigma = np.asarray(ckpt_cfg.get("sigma", cfg["sigma"]), dtype=np.float64)
+    target_mu, target_sigma = compute_target_stats(test_np, ckpt_cfg)
     moment_stats = summarize_moments(gen, target_mu, target_sigma)
 
     energy_stat = max(results["energy_stat"], 0.0)
@@ -234,12 +256,12 @@ def main() -> None:
     print(
         " ".join(
             [
-                f"{moment_stats['mu_diff']:.6f}",
-                f"{moment_stats['sigma_diff']:.6f}",
-                f"{energy_stat}",
-                f"{mmd_stat}",
-                f"{results['energy_p']:.6f}",
-                f"{results['mmd_p']:.6f}",
+                f"{moment_stats['mu_diff']:.16f}",
+                f"{moment_stats['sigma_diff']:.16f}",
+                f"{energy_stat:.16f}",
+                f"{mmd_stat:.16f}",
+                f"{results['energy_p']:.16f}",
+                f"{results['mmd_p']:.16f}",
             ]
         )
     )

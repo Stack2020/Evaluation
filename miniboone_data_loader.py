@@ -104,3 +104,30 @@ def prepare_miniboone_loaders(
     }
 
     return train_loader, val_loader, test_loader, stats
+
+
+def generate_test(
+    config: Dict,
+    seed: int | None = None,
+) -> np.ndarray:
+    """
+    Load MiniBooNE, split with the provided ratios, z-standardize using train statistics,
+    and return the standardized test split.
+    """
+    data_path = config.get("miniboone_path", "./data/miniboone.npy")
+    train_ratio = float(config.get("train_ratio", 0.8))
+    val_ratio = float(config.get("val_ratio", 0.1))
+    test_ratio = float(config.get("test_ratio", 0.1))
+    seed_val = int(config.get("seed", 42) if seed is None else seed)
+
+    data = load_miniboone_array(data_path)
+    train_raw, val_raw, test_raw = split_dataset(
+        data,
+        train_ratio=train_ratio,
+        val_ratio=val_ratio,
+        test_ratio=test_ratio,
+        seed=seed_val,
+    )
+
+    train_z, _val_z, test_z, _mean, _std = z_standardize(train_raw, val_raw, test_raw)
+    return test_z.astype(np.float32, copy=False)

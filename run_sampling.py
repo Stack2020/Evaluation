@@ -4,10 +4,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from config import config, get_device
+from miniboone_data_loader import generate_test
 
 from model import build_model
 from sample import (
-    load_checkpoint,
     oracle_sample,
     pc_sample,
     pf_sample,
@@ -97,21 +97,29 @@ def show_sample_scatter(
 
 
 def main() -> None:
-    seed = int(config.get("seed", 42))
+    cfg = dict(config)
+    seed = int(cfg.get("seed", 42))
     set_seed(seed)
 
     device = get_device()
     if device.type == "cuda":
         print("Using device:", device)
 
-    model = build_model(config, device)
+    checkpoint_path = str(cfg["config_path"])
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    ckpt_cfg = dict(checkpoint.get("config", {}))
+    merged_cfg = dict(cfg)
+    merged_cfg.update(ckpt_cfg)
+    merged_cfg["config_path"] = checkpoint_path
 
-    config_path = config["config_path"]
+    test_np = generate_test(merged_cfg, seed=seed)
+    data_dim = int(test_np.shape[1]) if test_np.ndim > 1 else 1
+    merged_cfg["data_dim"] = data_dim
 
-    checkpoint = load_checkpoint(model, config_path, device)
-    checkpoint_config = checkpoint.get("config", config)
+    model = build_model(merged_cfg, device)
+    model.load_state_dict(checkpoint["model"])
 
-    test_np = generate_test(checkpoint_config, seed=seed)
+    checkpoint_config = merged_cfg
 
     output_paths = {
         "PC": Path("pc_samples.png"),

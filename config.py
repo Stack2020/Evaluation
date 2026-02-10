@@ -1,6 +1,6 @@
 import torch
 config = {
-    "seed": 52,
+    "seed": 42,
     "beta_min": 0.1,
     "beta_max": 20.0,
     "eps": 1e-3,
@@ -35,7 +35,7 @@ config = {
     "num_steps": 4000,
     "snr": 0.08,
     "corrector_steps": 2,
-    "config_path": "vp_sde_best_miniboone_regularization_high.pt",
+    "config_path": "vp_sde_best_miniboone_regularization.pt",
     "miniboone_path": "./data/miniboone.npy"
 }
 
