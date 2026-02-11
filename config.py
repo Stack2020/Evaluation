@@ -35,7 +35,7 @@ config = {
     "clip_grad_norm": 5.0,
     "lambda_gamma": 1.0,
 
-    "curl": True,
+    "curl": False,
     "lambda_max": 0.1,
     "t_cutoff": 0.1,
     "k": 120,
@@ -45,7 +45,7 @@ config = {
     "scatter_alpha": 0.5,
     "scatter_size": 10,
     "density_method": "heun",
-    "config_path": "vp_sde_best_involute_regularization.pt",
+    "config_path": "vp_sde_best_involute.pt",
 }
 
 
