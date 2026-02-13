@@ -1,6 +1,6 @@
 import torch
 config = {
-    "seed": 50,
+    "seed": 52,
     "n_train": 100000,
     "n_val": 10000,
     "n_test": 10000,
@@ -35,7 +35,7 @@ config = {
     "scatter_alpha": 0.5,
     "scatter_size": 10,
     "density_method":"heun",
-    "config_path": "vp_sde_best_gmm_regularization_median.pt",
+    "config_path": "vp_sde_best_gmm_high.pt",
 }
          
 
