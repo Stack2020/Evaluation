@@ -1,7 +1,7 @@
 import torch
 
 config = {
-    "seed": 52,
+    "seed": 50,
     "data_dim": 5,
     "n_train": 100000,
     "n_val": 10000,
@@ -46,7 +46,7 @@ config = {
     "scatter_alpha": 0.5,
     "scatter_size": 10,
     "density_method":"heun",
-    "config_path": "vp_sde_best_gaussian_high.pt",
+    "config_path": "vp_sde_best_gaussian_median.pt",
 }
 
 
