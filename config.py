@@ -46,7 +46,7 @@ config = {
     "scatter_alpha": 0.5,
     "scatter_size": 10,
     "density_method":"heun",
-    "config_path": "vp_sde_best_wrap_high.pt"
+    "config_path": "vp_sde_best_wrap_regularization_high.pt"
 }
 
 
