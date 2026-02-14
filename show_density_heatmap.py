@@ -14,7 +14,7 @@ DEFAULT_SETTINGS = {
     "resolution": 200,
     "span_sigma": 4.0,
     "batch_size": 512,
-    "output_path": Path("density_heatmaps_involute.png"),
+    "output_path": Path("density_heatmaps_involute_regularization_premium.png"),
     "plot_bounds": (-6.0, 6.0, -6.0, 6.0),
 }
 
