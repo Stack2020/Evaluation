@@ -15,7 +15,7 @@ DEFAULT_SETTINGS = {
     "resolution": 200,
     "span_sigma": 4.0,
     "batch_size": 512,
-    "output_path": Path("density_heatmaps_gmm_gaussian.png"),
+    "output_path": Path("density_heatmaps_gmm_regularization_high.png"),
     "method": "Heun",
     "steps_override": None,
     "eps_override": None,
