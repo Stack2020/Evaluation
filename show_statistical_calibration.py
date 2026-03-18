@@ -181,7 +181,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--method", choices=["pc", "pf"], default="pf", help="Sampling method to generate new data.")
     parser.add_argument("--permutations", type=int, default=500, help="Number of permutations for p-value estimation.")
     parser.add_argument("--seed", type=int, default=None, help="Random seed (defaults to config seed).")
-    parser.add_argument("--num-gen", type=int, default=None, help="Number of generated samples (default: config n_gen).")
+    parser.add_argument("--num-gen", type=int, default=10000, help="Number of generated samples (default: 10000).")
     parser.add_argument(
         "--bandwidth-scales",
         type=float,
@@ -204,10 +204,12 @@ def main() -> None:
     checkpoint = load_checkpoint(model, cfg["config_path"], device)
     ckpt_cfg = checkpoint.get("config", cfg)
 
-    n_gen = int(ckpt_cfg.get("n_gen", 5000) if args.num_gen is None else args.num_gen)
+    n_gen = int(args.num_gen)
+    eval_cfg = dict(ckpt_cfg)
+    eval_cfg["n_test"] = n_gen
 
     # Always treat as Gaussian mixture
-    test_np = generate_gmm_test(ckpt_cfg, seed=seed)
+    test_np = generate_gmm_test(eval_cfg, seed=seed)
 
     with torch.no_grad():
         if args.method == "pf":
