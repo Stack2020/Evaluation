@@ -172,7 +172,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--method", choices=["pc", "pf"], default="pc", help="Sampling method to generate new data.")
     parser.add_argument("--permutations", type=int, default=200, help="Number of permutations for p-value estimation.")
     parser.add_argument("--seed", type=int, default=None, help="Random seed (defaults to config seed).")
-    parser.add_argument("--num-gen", type=int, default=None, help="Number of generated samples (default: config n_gen).")
+    parser.add_argument("--num-gen", type=int, default=None, help="Number of generated samples (default: at least 10000).")
     parser.add_argument(
         "--bandwidth-scales",
         type=float,
@@ -195,9 +195,15 @@ def main() -> None:
     checkpoint = load_checkpoint(model, cfg["config_path"], device)
     ckpt_cfg = checkpoint.get("config", cfg)
 
-    n_gen = int(ckpt_cfg.get("n_gen", 5000) if args.num_gen is None else args.num_gen)
+    if args.num_gen is None:
+        n_gen = int(max(10000, ckpt_cfg.get("n_gen", cfg.get("n_gen", 10000))))
+    else:
+        n_gen = int(args.num_gen)
 
-    test_np = generate_test(ckpt_cfg, seed=seed)
+    eval_cfg = dict(ckpt_cfg)
+    eval_cfg["n_test"] = n_gen
+
+    test_np = generate_test(eval_cfg, seed=seed)
 
     with torch.no_grad():
         if args.method == "pf":
