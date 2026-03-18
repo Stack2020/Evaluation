@@ -44,7 +44,7 @@ config = {
     "scatter_alpha": 0.5,
     "scatter_size": 10,
     "density_method": "heun",
-    "config_path": "vp_sde_best_involute_regularization_premium.pt",
+    "config_path": "vp_sde_best_involute_low.pt",
 }
 
 
