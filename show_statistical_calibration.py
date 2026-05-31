@@ -183,7 +183,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--method", choices=["pc", "pf"], default="pf", help="Sampling method to generate new data.")
     parser.add_argument("--permutations", type=int, default=200, help="Number of permutations for p-value estimation.")
     parser.add_argument("--seed", type=int, default=None, help="Random seed (defaults to config seed).")
-    parser.add_argument("--num-gen", type=int, default=None, help="Number of generated samples (default: config n_gen).")
+    parser.add_argument("--num-gen", type=int, default=10000, help="Number of generated samples (default: 10000).")
     parser.add_argument(
         "--bandwidth-scales",
         type=float,
@@ -221,7 +221,7 @@ def main() -> None:
 
     ckpt_cfg = merged_cfg
 
-    n_gen = int(ckpt_cfg.get("n_gen", 5000) if args.num_gen is None else args.num_gen)
+    n_gen = int(args.num_gen)
 
     with torch.no_grad():
         if args.method == "pf":
